@@ -1,9 +1,7 @@
 # Kafka Retryable Consumer
-[![Quality Gate Status](https://sonar.michelin.com/sonar/api/project_badges/measure?project=com.michelin.kafka%3Aretryable-consumer-core&metric=alert_status&token=sqb_1b56f656f3defab62d32ba03be9c05e8d42dd5a2)](https://sonar.michelin.com/sonar/dashboard?id=com.michelin.kafka%3Aretryable-consumer-core)
 
 Retryable Consumer Libraries, allow you to easily build a Kafka API consumer with retry capabilities.
-This lib is proposed to ease the usage of kafka for simple data consumer with external system call. It implements
-kafka design best practices detailed in this documentation : https://integration.si-pages.michelin.com/kafkapages/details/developer/kafka-dev-external-systems.html
+This lib is proposed to ease the usage of kafka for simple data consumer with external system call. 
 
 ## Features
 ### Current version
