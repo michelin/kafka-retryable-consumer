@@ -1,0 +1,64 @@
+{
+  "namespace": "com.michelin.kafka.avro",
+  "type": "record",
+  "name": "GenericErrorModel",
+  "fields": [
+    {
+      "name": "cause",
+      "type": ["null", "string"],
+      "doc": "Information of the main root cause, generating the issue. For technical issues, it can contains the actual exception cause",
+      "default": null
+    },
+    {
+      "name": "contextMessage",
+      "type": ["null", "string"],
+      "doc": "Information about the context (technical or functional) where the issue occurs",
+      "default": null
+    },
+    {
+      "name": "stack",
+      "type": ["null", "string"],
+      "doc": "If available, the exception stack trace can be pushed in this attribute",
+      "default": null
+    },
+    {
+      "name": "key",
+      "type": ["null", "string"],
+      "doc": "erroneous message key in string format",
+      "default": null
+    },
+    {
+      "name": "byteKey",
+      "type": [ "null", "bytes"],
+      "doc": "erroneous message key in bytes[] when message key is not deserializable",
+      "default": null
+    },
+    {
+      "name": "value",
+      "type": ["null", "string"],
+      "doc": "erroneous message in json format or string",
+      "default": null
+    },
+    {
+      "name": "byteValue",
+      "type": [ "null", "bytes"],
+      "doc": "erroneous message in bytes[] when message is not deserializable",
+      "default": null
+    },
+    {
+      "name": "offset",
+      "type": "long",
+      "doc": "Source offset of erroneous message"
+    },
+    {
+      "name": "partition",
+      "type": "int",
+      "doc": "Source partition of erroneous message"
+    },
+    {
+      "name": "topic",
+      "type": "string",
+      "doc": "Source topic of erroneous message"
+    }
+  ]
+}

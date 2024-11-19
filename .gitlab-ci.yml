@@ -1,0 +1,2 @@
+include:
+  - 'retryable-consumer-core/.gitlab-ci.yml'

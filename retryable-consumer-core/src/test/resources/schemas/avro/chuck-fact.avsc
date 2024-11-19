@@ -1,0 +1,8 @@
+{"namespace": "com.michelin.kafka.test",
+  "type": "record",
+  "name": "ChuckFact",
+  "fields": [
+    {"name": "id",     "type": "string"},
+    {"name": "fact",   "type": "string"}
+  ]
+}

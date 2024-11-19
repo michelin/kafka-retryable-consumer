@@ -1,0 +1,123 @@
+package com.michelin.kafka.configuration;
+
+import lombok.*;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.*;
+
+import static com.michelin.kafka.configuration.KafkaRetryableConfiguration.PROPERTY_SEPARATOR;
+
+
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Slf4j
+@Getter
+@Setter
+public class RetryableConsumerConfiguration {
+
+    /**
+     * Contains the Kafka properties defined in the application.properties file.
+     * The properties are mapped according to the prefix defined in the ConfigurationProperties annotation
+     * and the name of this variable.
+     */
+    private Properties properties = new Properties();
+
+    /**
+     * Topic
+     */
+    private Collection<String> topics = Collections.emptyList();
+
+    /**
+     * Not retryable exceptions
+     */
+    private Collection<String> notRetryableExceptions = Collections.emptyList();
+
+    /**
+     * Circuit break max retry
+     */
+    private Long retryMax = 0L;
+
+    /**
+     * Circuit breaker backoff between each retry
+     */
+    private Long retryBackoffMs = 0L;
+
+    private final static Long DEFAULT_POLL_BACKOFF_MS = 1000L;
+
+    /**
+     * Timeout duration in ms for polling.
+     * This is the time until the consumer will wait if there is no record
+     * before stopping to poll
+     * Default value is 1000 milliseconds
+     */
+    private Long pollBackoffMs = DEFAULT_POLL_BACKOFF_MS;
+
+    public void loadConfigMap(Map<String, Object> retryablConsumerConfigMap) {
+        retryablConsumerConfigMap.forEach((k,v) -> {
+            if(k.startsWith("properties")) {
+                this.getProperties().put(StringUtils.substringAfter(k, PROPERTY_SEPARATOR), v);
+            }
+            if(k.startsWith("topics")) {
+                if (v instanceof String s) {
+                    this.setTopics(Arrays.asList((s).replace(" ", "").split(",")));
+                } else if (v instanceof ArrayList l) {
+                    this.setTopics((ArrayList<String>) l);
+                } else {
+                    throw new IllegalArgumentException(
+                            "Parameter 'not-retryable-exceptions' must be a list of exception classes");
+                }
+            }
+            if(k.startsWith("poll.backoff.ms")) {
+                String pollBackOff = String.valueOf(v);
+                this.setPollBackoffMs(Long.valueOf(pollBackOff));
+            }
+            if(k.startsWith("retry.max")) {
+                String retryMaxStr = String.valueOf(v);
+                this.setRetryMax(Long.valueOf(retryMaxStr));
+            }
+            if(k.startsWith("retry.backoff.ms")) {
+                String retryBackoffMsStr = String.valueOf(v);
+                this.setRetryBackoffMs(Long.valueOf(retryBackoffMsStr));
+            }
+            if(k.startsWith("not-retryable-exceptions")) {
+                if(v instanceof String s) {
+                    this.setNotRetryableExceptions(
+                        Arrays.asList((s).replace(" ", "").split(",")));
+                } else if(v instanceof ArrayList) {
+                    this.setNotRetryableExceptions((ArrayList<String>) v);
+                } else {
+                    throw new IllegalArgumentException(
+                            "Parameter 'not-retryable-exceptions' must be a list of exception classes");
+                }
+            }
+        });
+    }
+
+    public void loadConfigProperties(String configurationPrefix, Properties retryablConsumerConfigProperties) {
+        final HashMap<String, Object> consumerConfigMap = new HashMap<>();
+
+        String prefix;
+        if(configurationPrefix != null && !configurationPrefix.isEmpty()) {
+            prefix = configurationPrefix + ".";
+        } else {
+            prefix = "";
+        }
+
+        retryablConsumerConfigProperties.forEach((k, v) -> {
+            if(StringUtils.startsWith((String)k,  prefix+"consumer.")) {
+                consumerConfigMap.put(
+                        StringUtils.substringAfter((String)k, prefix+"consumer."),
+                        v
+                );
+            }
+        });
+
+        if(consumerConfigMap.isEmpty()) {
+            throw new IllegalArgumentException("No '" + prefix + "consumer' configuration found in configuration file");
+        }
+
+        this.loadConfigMap(consumerConfigMap);
+    }
+}

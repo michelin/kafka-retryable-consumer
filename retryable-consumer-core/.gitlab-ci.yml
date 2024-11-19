@@ -1,0 +1,94 @@
+default:
+  tags:
+    - k8s
+    - dif
+    - europe
+
+variables:
+  SUB_MODULE_FOLDER: "retryable-consumer-core"
+  MAVEN_OPTS: "-DXss100M -DXmx512M -Dhttps.protocols=TLSv1,TLSv1.1,TLSv1.2"
+  MAVEN_CLI_OPTS: "--batch-mode -Dstyle.color=always -Djansi.force=true"
+  MAVEN_BASE: "$MAVEN_OPTS -P prod -DskipTests -Ddependency-check.skip=true -Drevision=$CI_PIPELINE_IID"
+  MAVEN_TEST: "$MAVEN_OPTS -Drevision=$CI_PIPELINE_IID -Dchangelist=SNAPSHOT"
+  MAVEN_SONAR: "$MAVEN_OPTS -Drevision=$CI_PIPELINE_IID -Dsonar.host.url=$SONAR_URL -Dsonar.login=$SONAR_TOKEN"
+
+stages:
+  - 🧪 quality
+  - 📦 snapshot
+  - 🚀 release
+
+##################################  TEST & SONAR  ###################################
+test:
+  image : docker.artifactory.michelin.com/michelin/hub/eclipse-temurin17-jdk-alpine-maven-rootless:bib-1.5
+  stage: 🧪 quality
+  before_script:
+    - cd ${SUB_MODULE_FOLDER}
+  script:
+    - mvn $MAVEN_TEST compile test
+  rules:
+    - if: $CI_COMMIT_MESSAGE !~ /maven-release/
+
+
+sonar for branch:
+  image : docker.artifactory.michelin.com/michelin/hub/eclipse-temurin17-jdk-alpine-maven-rootless:bib-1.5
+  stage: 🧪 quality
+  before_script:
+    - cd ${SUB_MODULE_FOLDER}
+  script:
+    - mvn $MAVEN_SONAR -Dchangelist=SNAPSHOT --batch-mode jacoco:prepare-agent test jacoco:report sonar:sonar -Dsonar.branch.name=$CI_COMMIT_REF_NAME -Dsonar.branch.target=master
+  rules:
+    - if: '$CI_COMMIT_MESSAGE !~ "/maven-release/" && $CI_COMMIT_BRANCH != "main"'
+      allow_failure: true
+
+sonar for main:
+  image : docker.artifactory.michelin.com/michelin/hub/eclipse-temurin17-jdk-alpine-maven-rootless:bib-1.5
+  stage: 🧪 quality
+  before_script:
+    - cd ${SUB_MODULE_FOLDER}
+  script:
+    - mvn $MAVEN_SONAR -Dchangelist=RELEASE --batch-mode jacoco:prepare-agent test jacoco:report sonar:sonar -Dsonar.branch.name=$CI_COMMIT_REF_NAME -Drevision=$CI_PIPELINE_IID
+  rules:
+    - if: '$CI_COMMIT_MESSAGE !~ "/maven-release/" && $CI_COMMIT_BRANCH == "main"'
+      allow_failure: true
+
+
+SNAPSHOT Publish:
+  image : docker.artifactory.michelin.com/michelin/hub/eclipse-temurin17-jdk-alpine-maven-rootless:bib-1.5
+  stage: 📦 snapshot
+  before_script:
+    - cd ${SUB_MODULE_FOLDER}
+  script:
+    - mkdir $HOME/.m2
+    - cp $MAVEN_SETTINGS_XML $HOME/.m2/settings.xml
+    - cat $HOME/.m2/settings.xml
+    - mvn $MAVEN_CLI_OPTS $MAVEN_OPTS -DskipTests -DrepositoryId=kfk-mvn-snapshot -Dchangelist=SNAPSHOT deploy
+  rules:
+    - if: '$CI_COMMIT_MESSAGE !~ "/maven-release/"'
+  tags:
+    - k8s
+    - dif
+    - europe
+
+RELEASE publish:
+  image : docker.artifactory.michelin.com/michelin/hub/eclipse-temurin17-jdk-alpine-maven-rootless:bib-1.5
+  stage: 🚀 release
+  before_script:
+    - cd ${SUB_MODULE_FOLDER}
+  script:
+    - git config --global user.email "$GITLAB_USER_EMAIL"
+    - git config --global user.name "$GITLAB_USER_NAME"
+    - git config --global --add safe.directory '*'
+    - git checkout "$CI_COMMIT_REF_NAME"
+    - git reset --hard origin/"$CI_COMMIT_REF_NAME"
+    - mkdir $HOME/.m2
+    - cp $MAVEN_SETTINGS_XML $HOME/.m2/settings.xml
+    - mvn $MAVEN_CLI_OPTS release:prepare -Darguments="-Dmaven.test.skip=true -Dmaven.javadoc.skip=true -DrepositoryId=releases -Dchangelist=RELEASE"
+    - mvn $MAVEN_CLI_OPTS release:perform -Darguments="-Dmaven.test.skip=true -Dmaven.javadoc.skip=true -DrepositoryId=releases -Dchangelist=RELEASE"
+  rules:
+  - if: '$CI_COMMIT_MESSAGE !~ "/maven-release/" && $CI_COMMIT_BRANCH == "main"'
+  tags:
+    - k8s
+    - dif
+    - europe
+  when: manual
+
