@@ -39,7 +39,7 @@ try(RetryableConsumer<String, String> retryableConsumer = new RetryableConsumer<
     );
 }
 ```
-`businessProcessor` is must be your own processing classe with a method (`processRecord` in this example) accepting one
+`businessProcessor` must be your own processing classe with a method (`processRecord` in this example) accepting one
 `ConsumerRecord<K, V>` as input.
 
 :warning: ```java listen(topics)``` method is blocker and will start an endless loop to consumer you topic record.
