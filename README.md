@@ -106,7 +106,7 @@ public class RetryableConsumerConfiguration extends KafkaRetryableConfiguration 
 
 In this example, all retryable consumer configuration should be placed under "kafka.retryable" prefix in config file.
 
-Example of application.yml file working with Michelin Dev kafka cluster:
+Example of application.yml
 ```yaml 
 kafka:
   retryable:
@@ -121,8 +121,8 @@ kafka:
           ms: 500 # The time, in milliseconds, spent waiting in poll if data is not available in the buffer.
       properties: # All Kafka server configuration, please add your custom kafka consumer config here
         auto.offset.reset: earliest
-        bootstrap.servers: pkc-mvjp7.northeurope.azure.confluent.cloud:9092 # This is kafka dev cluster
-        schema.registry.url: https://api.michelin.com/ccloud-schema-registry/dev/ # This is kafka dev sr
+        bootstrap.servers: mybootstrap-server:9092 # This is kafka dev cluster
+        schema.registry.url: https://my-schema-registry/dev/ # This is kafka dev sr
         basic.auth.credentials.source: USER_INFO
         basic.auth.user.info: user:user-secret
         key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -143,8 +143,8 @@ kafka:
       topics: prefix.myTopic
     dead-letter:
       properties: # All Kafka server configuration for the dlq producer, please add your custom kafka producer config
-        bootstrap.servers: pkc-mvjp7.northeurope.azure.confluent.cloud:9092 # This is kafka dev cluster
-        schema.registry.url: https://api.michelin.com/ccloud-schema-registry/dev/ # This is kafka dev sr
+        bootstrap.servers: mybootstrap-server:9092 # This is kafka dev cluster
+        schema.registry.url: https://my-schema-registry/dev/ # This is kafka dev sr
         basic.auth.credentials.source: USER_INFO
         basic.auth.user.info: user:user-secret
         acks: all
