@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 @Timeout(15)
-public class RetryableConsumerIT {
+public class RetryableConsumerIntegrationTest {
 
     /**
      * Default timeout used by various Kafka consumer to wait for new message in a topic
@@ -37,7 +37,7 @@ public class RetryableConsumerIT {
      * The in memory Kafka Cluster.
      * Not mocked servers, but real ZooKeeper/SchemaRegistry/KafkaBroker instances !
      */
-    public static EmbeddedKafkaCluster KAFKA_CLUSTER = new EmbeddedKafkaCluster(1);;
+    public static final EmbeddedKafkaCluster KAFKA_CLUSTER = new EmbeddedKafkaCluster(1);
 
     /**
      * The Kafka cluster properties used by both Producers and Consumers.
@@ -46,8 +46,7 @@ public class RetryableConsumerIT {
 
     /**
      * Shared test producer configuration used to push test data into topics
-     */
-    private static final Properties dataInjectionProducerConfig = new Properties();
+     */    private static final Properties dataInjectionProducerConfig = new Properties();
 
     /**
      * Shared test Dead Letter Topic consumer configuration
@@ -59,17 +58,20 @@ public class RetryableConsumerIT {
      */
     private static final KafkaRetryableConfiguration kafkaRetryableConfiguration = new KafkaRetryableConfiguration();
 
-    private String DATA_TOPIC;
-    private String DEAD_LETTER_TOPIC;
+    private String dataTopic;
+    private String deadLetterTopic;
 
     @BeforeAll
-    public static void setup() throws Exception {
-
+    static void setup() throws Exception {
+        log.info("Starting embedded kafka cluster...");
+        KAFKA_CLUSTER.start();
+        setupKafkaConfig();
     }
 
     @AfterAll
-    public static void teardown() {
-
+    static void teardown() {
+        log.info("Shutting down embedded kafka cluster...");
+        KAFKA_CLUSTER.stop();
     }
 
 
@@ -110,32 +112,24 @@ public class RetryableConsumerIT {
     }
 
     @BeforeEach
-    public void initTestInfo(TestInfo testInfo) throws Exception {
-        log.info("Starting embedded kafka cluster...");
-        KAFKA_CLUSTER.start();
-        setupKafkaConfig();
+    void initTestInfo(TestInfo testInfo) throws Exception {
 
+        log.info("Init topic for test {} ...", testInfo.getDisplayName());
 
         if(testInfo.getTestMethod().isPresent()) {
             final String currentTestName = testInfo.getTestMethod().get().getName().toUpperCase();
-            this.DATA_TOPIC = "TOPIC-" + currentTestName;
-            this.DEAD_LETTER_TOPIC = "DEAD-LETTER-" + currentTestName;
+            this.dataTopic = "TOPIC-" + currentTestName;
+            this.deadLetterTopic = "DEAD-LETTER-" + currentTestName;
         } else {
-            this.DATA_TOPIC = "TOPIC-TEST";
-            this.DEAD_LETTER_TOPIC = "DEAD-LETTER-TEST";
+            this.dataTopic = "TOPIC-TEST";
+            this.deadLetterTopic = "DEAD-LETTER-TEST";
         }
 
-        KAFKA_CLUSTER.createTopic(DATA_TOPIC, 3, (short) 1);
-        KAFKA_CLUSTER.createTopic(DEAD_LETTER_TOPIC, 3, (short) 1);
+        KAFKA_CLUSTER.createTopic(dataTopic, 3, (short) 1);
+        KAFKA_CLUSTER.createTopic(deadLetterTopic, 3, (short) 1);
 
         //Setup specific dead letter queue for each test
-        kafkaRetryableConfiguration.getDeadLetter().setTopic(DEAD_LETTER_TOPIC);
-    }
-
-    @AfterEach
-    public void testTeardown() throws InterruptedException {
-        log.info("Shutting down embedded kafka cluster...");
-        KAFKA_CLUSTER.stop();
+        kafkaRetryableConfiguration.getDeadLetter().setTopic(deadLetterTopic);
     }
 
     @Test
@@ -145,7 +139,7 @@ public class RetryableConsumerIT {
         final int numberOfRecordToProduce = 30;
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(dataInjectionProducerConfig)) {
             for (int i = 0; i < numberOfRecordToProduce; i++) {
-                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(DATA_TOPIC,"k"+i,"value"+i)).get();
+                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(dataTopic,"k"+i,"value"+i)).get();
                 log.info("Record sent to topic {} in partition {}, offset {}",
                         recordMeta.topic(), recordMeta.partition(), recordMeta.offset());
             }
@@ -156,10 +150,10 @@ public class RetryableConsumerIT {
             //Call the record processor on each received record
             List<ConsumerRecord<String, String>> consumedRecords = new ArrayList<>();
             retryableConsumer.listenAsync(
-                    Collections.singleton(DATA_TOPIC),
-                    record -> { //Build a record process that fails on purpose only one time
-                        log.info("[TEST] record {} received from partition {} ...", record.key(), record.partition());
-                        consumedRecords.add(record);
+                    Collections.singleton(dataTopic),
+                    consumerRecord -> { //Build a record process that fails on purpose only one time
+                        log.info("[TEST] record {} received from partition {} ...", consumerRecord.key(), consumerRecord.partition());
+                        consumedRecords.add(consumerRecord);
                     });
 
             //THEN
@@ -173,7 +167,7 @@ public class RetryableConsumerIT {
         }
 
         /* Verify Dead Letter topic does not contain anything */
-        List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(DEAD_LETTER_TOPIC);
+        List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(deadLetterTopic);
         assertTrue(
                 deadLetterRecords.isEmpty(),
                 deadLetterRecords.size() + " record(s) found inside dead letter topic!"
@@ -188,7 +182,7 @@ public class RetryableConsumerIT {
         final int numberOfRecordToProduce = 200;
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(dataInjectionProducerConfig)) {
             for (int i = 0; i < numberOfRecordToProduce; i++) {
-                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(DATA_TOPIC,"k"+i,"value"+i)).get();
+                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(dataTopic,"k"+i,"value"+i)).get();
                 log.info("Record sent to topic {} in partition {}, offset {}",
                         recordMeta.topic(), recordMeta.partition(), recordMeta.offset());
             }
@@ -199,10 +193,10 @@ public class RetryableConsumerIT {
             //Call the record processor on each received record
             List<ConsumerRecord<String, String>> consumedRecords = new ArrayList<>();
             retryableConsumer.listenAsync(
-                    Collections.singleton(DATA_TOPIC),
-                    record -> { //Build a record process that fails on purpose only one time
-                        log.info("[TEST] record {} received from partition {} ...", record.key(), record.partition());
-                        consumedRecords.add(record);
+                    Collections.singleton(dataTopic),
+                    consumerRecord -> { //Build a record process that fails on purpose only one time
+                        log.info("[TEST] record {} received from partition {} ...", consumerRecord.key(), consumerRecord.partition());
+                        consumedRecords.add(consumerRecord);
                     });
 
             //THEN
@@ -216,7 +210,7 @@ public class RetryableConsumerIT {
         }
 
         /* Verify Dead Letter topic does not contain anything */
-        List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(DEAD_LETTER_TOPIC);
+        List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(deadLetterTopic);
         assertTrue(
                 deadLetterRecords.isEmpty(),
                 deadLetterRecords.size() + " record(s) found inside dead letter topic!"
@@ -230,7 +224,7 @@ public class RetryableConsumerIT {
         final int numberOfRecordToProduce = 50;
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(dataInjectionProducerConfig)) {
             for (int i = 0; i < numberOfRecordToProduce; i++) {
-                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(DATA_TOPIC,"k"+i,"value"+i)).get();
+                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(dataTopic,"k"+i,"value"+i)).get();
                 log.info("Record sent to topic {} in partition {}, offset {}",
                         recordMeta.topic(), recordMeta.partition(), recordMeta.offset());
             }
@@ -242,15 +236,15 @@ public class RetryableConsumerIT {
             List<ConsumerRecord<String, String>> consumedRecords = new ArrayList<>();
             AtomicInteger receivedRecordCounter = new AtomicInteger();
             retryableConsumer.listenAsync(
-                    Collections.singleton(DATA_TOPIC),
-                    record -> { //Build a record process that fails on purpose only one time
+                    Collections.singleton(dataTopic),
+                    consumerRecord -> { //Build a record process that fails on purpose only one time
                         receivedRecordCounter.getAndIncrement();
                         if(receivedRecordCounter.get() == 1) {
                             //Let's provoque a retryable failure on the 2nd record processing
                             throw new Exception("Fake retryable exception"); //By default, "Exception" type is retryable
                         } else {
                             //Run the normal business process
-                            consumedRecords.add(record);
+                            consumedRecords.add(consumerRecord);
                         }
                     }
             );
@@ -267,7 +261,7 @@ public class RetryableConsumerIT {
                             "were not received within "+timeoutSecond+" seconds");
 
             /* Verify Dead Letter topic does not contain anything */
-            List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(DEAD_LETTER_TOPIC);
+            List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(deadLetterTopic);
             assertTrue(
                     deadLetterRecords.isEmpty(),
                     deadLetterRecords.size() + " record(s) found inside dead letter topic!"
@@ -282,7 +276,7 @@ public class RetryableConsumerIT {
         final int numberOfRecordToProduce = 50;
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(dataInjectionProducerConfig)) {
             for (int i = 0; i < numberOfRecordToProduce; i++) {
-                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(DATA_TOPIC, "k" + i, "value" + i)).get();
+                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(dataTopic, "k" + i, "value" + i)).get();
                 log.info("Record sent to topic {} in partition {}, offset {}",
                         recordMeta.topic(), recordMeta.partition(), recordMeta.offset());
             }
@@ -298,23 +292,18 @@ public class RetryableConsumerIT {
             AtomicInteger receivedRecordCounter = new AtomicInteger(0);
 
             retryableConsumer.listenAsync(
-                    Collections.singleton(DATA_TOPIC),
-                    record -> {
+                    Collections.singleton(dataTopic),
+                    consumerRecord -> {
                         //Build a record process that fails on purpose only one time on the 23rd record
                         if (receivedRecordCounter.getAndIncrement() == 23) {
                             //Let's generate a non retryable failure
-                            errorRecord.set(record);
-                            //throw new RecordDeserializationException( //This exception is known to be not retryable
-                            //        new TopicPartition(record.topic(), record.partition()),
-                            //        record.offset(),
-                            //        "Fake deserialization error", new Exception("Poison pills")
-                            //);
+                            errorRecord.set(consumerRecord);
 
                             //Throw a custom non retryable custom exception
                             throw new NotRetryableCustomException("Fake error");
                         } else {
                             //Run the normal (successful) business process
-                            consumedRecords.add(record);
+                            consumedRecords.add(consumerRecord);
                         }
                     }
             );
@@ -326,7 +315,7 @@ public class RetryableConsumerIT {
                     Duration.ofSeconds(10), //Wait for 10 seconds to have the expected number of record processed
                     () -> waitForListSize(consumedRecords, expectedRecordNumber),
                     "Wrong number of record processed (" + consumedRecords.size() + ") " +
-                            "from topic "+DATA_TOPIC+" within 10 seconds, expected "+expectedRecordNumber);
+                            "from topic "+ dataTopic +" within 10 seconds, expected "+expectedRecordNumber);
             /* Verify poison pills is not present in consumed record */
             consumedRecords.forEach(r -> {
                 if (r.key().equals(errorRecord.get().key()))
@@ -336,7 +325,7 @@ public class RetryableConsumerIT {
             /* Verify poison pill has been sent into DL Topic */
             try (KafkaConsumer<String, GenericErrorModel> dlqConsumer =
                          new KafkaConsumer<>(dlqConsumerConfig)) {
-                dlqConsumer.subscribe(Collections.singleton(DEAD_LETTER_TOPIC));
+                dlqConsumer.subscribe(Collections.singleton(deadLetterTopic));
 
                 final int EXPECTED_DL_RECORD_NUMBER = 1;
                 List<ConsumerRecord<String, GenericErrorModel>> dlqRecords = new ArrayList<>();
@@ -349,10 +338,10 @@ public class RetryableConsumerIT {
                         }
                     },
                     "Wrong number of record found (" + dlqRecords.size() + ") in Dead Letter topic "
-                            + DEAD_LETTER_TOPIC +" within 10 seconds, expected "+EXPECTED_DL_RECORD_NUMBER);
+                            + deadLetterTopic +" within 10 seconds, expected "+EXPECTED_DL_RECORD_NUMBER);
 
                 GenericErrorModel dlqError = dlqRecords.get(0).value();
-                Assertions.assertEquals(DATA_TOPIC, dlqError.getTopic(), "Wrong topic name defined in the DL topic message");
+                Assertions.assertEquals(dataTopic, dlqError.getTopic(), "Wrong topic name defined in the DL topic message");
                 Assertions.assertEquals(errorRecord.get().key(), dlqError.getKey(), "Wrong Key defined in the DL topic message");
                 Assertions.assertEquals(errorRecord.get().value(), dlqError.getValue(), "Wrong Value defined in the DL topic message");
                 Assertions.assertTrue(dlqError.getStack().contains("NotRetryableCustomException"), "Wrong exception sent to DLQ");
@@ -368,7 +357,7 @@ public class RetryableConsumerIT {
         final int numberOfRecordToProduce = 10;
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(dataInjectionProducerConfig)) {
             for (int i = 0; i < numberOfRecordToProduce; i++) {
-                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(DATA_TOPIC, "k" + i, "value" + i)).get();
+                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(dataTopic, "k" + i, "value" + i)).get();
                 log.info("Record sent to topic {} in partition {}, offset {}",
                         recordMeta.topic(), recordMeta.partition(), recordMeta.offset());
             }
@@ -387,24 +376,24 @@ public class RetryableConsumerIT {
             String keyInError = "k7";
 
             retryableConsumer.listenAsync(
-                    Collections.singleton(DATA_TOPIC),
-                    record -> {
-                        log.info("[TEST] record {} received from partition {} ...", record.key(), record.partition());
-                        if (record.key().equals(keyInError) ) {
+                    Collections.singleton(dataTopic),
+                    consumerRecord -> {
+                        log.info("[TEST] record {} received from partition {} ...", consumerRecord.key(), consumerRecord.partition());
+                        if (consumerRecord.key().equals(keyInError) ) {
                             keyInErrorRecordReceptionCounter.getAndIncrement();
                         }
                         // let's fail 5 times when we receive a specific record,
                         // on the 6th loop, the record will be process successfully
-                        if (record.key().equals(keyInError) && failureCounter.getAndIncrement()<5) {
+                        if (consumerRecord.key().equals(keyInError) && failureCounter.getAndIncrement()<5) {
                             //Let's generate a non retryable failure
-                            errorRecord.set(record);
+                            errorRecord.set(consumerRecord);
 
                             //Throw a custom non retryable custom exception
                             throw new Exception("Retryable Error");
                         } else {
                             //Run the normal (successful) business process
-                            consumedRecords.add(record);
-                            log.info("[TEST] record {} added to list", record.key());
+                            consumedRecords.add(consumerRecord);
+                            log.info("[TEST] record {} added to list", consumerRecord.key());
                         }
                     }
             );
@@ -415,16 +404,15 @@ public class RetryableConsumerIT {
                     Duration.ofSeconds(10), //Wait for 10 seconds to have the expected number of record processed
                     () -> waitForListSize(consumedRecords, numberOfRecordToProduce),
                     "Wrong number of record processed (" + consumedRecords.size() + ") " +
-                            "from topic "+DATA_TOPIC+" within 10 seconds, expected "+numberOfRecordToProduce);
+                            "from topic "+ dataTopic +" within 10 seconds, expected "+numberOfRecordToProduce);
 
 
             /* k3 record has been in error for sometimes */
 
             Assertions.assertEquals(keyInError, errorRecord.get().key());
-            //Assertions.assertEquals(5, keyInErrorRecordReceptionCounter.get()-1);
 
             /* Verify Dead Letter topic does not contain anything */
-            List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(DEAD_LETTER_TOPIC);
+            List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(deadLetterTopic);
             assertTrue(
                     deadLetterRecords.isEmpty(),
                     deadLetterRecords.size() + " record(s) found inside dead letter topic!"
@@ -439,7 +427,7 @@ public class RetryableConsumerIT {
         final int numberOfRecordToProduce = 10;
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(dataInjectionProducerConfig)) {
             for (int i = 0; i < numberOfRecordToProduce; i++) {
-                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(DATA_TOPIC, "k" + i, "value" + i)).get();
+                RecordMetadata recordMeta = producer.send(new ProducerRecord<>(dataTopic, "k" + i, "value" + i)).get();
                 log.info("Record sent to topic {} in partition {}, offset {}",
                         recordMeta.topic(), recordMeta.partition(), recordMeta.offset());
             }
@@ -457,25 +445,25 @@ public class RetryableConsumerIT {
             String keyInError = "k7";
 
             retryableConsumer.listenAsync(
-                    Collections.singleton(DATA_TOPIC),
-                    record -> {
-                        log.info("[TEST] record {} received ...", record.key());
-                        if (record.key().equals(keyInError) ) {
+                    Collections.singleton(dataTopic),
+                    consumerRecord -> {
+                        log.info("[TEST] record {} received ...", consumerRecord.key());
+                        if (consumerRecord.key().equals(keyInError) ) {
                             keyInErrorRecordReceptionCounter.getAndIncrement();
                         }
 
                         // let's fail each time we receive k9 record, after 10 retries,
                         // the record should be pushed to DLQ
-                        if (record.key().equals(keyInError)) {
+                        if (consumerRecord.key().equals(keyInError)) {
                             //Let's generate a non retryable failure
-                            errorRecord.set(record);
+                            errorRecord.set(consumerRecord);
 
                             //Throw a custom non retryable custom exception
                             throw new Exception("Retryable Error");
                         } else {
                             //Run the normal (successful) business process
-                            consumedRecords.add(record);
-                            log.info("[TEST] record {} added to consumed record list", record.key());
+                            consumedRecords.add(consumerRecord);
+                            log.info("[TEST] record {} added to consumed record list", consumerRecord.key());
                         }
                     }
             );
@@ -487,7 +475,7 @@ public class RetryableConsumerIT {
                     Duration.ofSeconds(10), //Wait for 10 seconds to have the expected number of record processed
                     () -> waitForListSize(consumedRecords, expectedRecordNumber),
                     "Wrong number of record processed (" + consumedRecords.size() + ") " +
-                            "from topic "+DATA_TOPIC+" within 10 seconds, expected "+expectedRecordNumber);
+                            "from topic "+ dataTopic +" within 10 seconds, expected "+expectedRecordNumber);
 
 
             /* k3 record has been in error for sometimes */
@@ -497,7 +485,7 @@ public class RetryableConsumerIT {
             /* Verify poison pill has been sent into DL Topic */
 
             /* Verify Dead Letter topic does not contain anything */
-            List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(DEAD_LETTER_TOPIC);
+            List<ConsumerRecord<String, GenericErrorModel>> deadLetterRecords = this.getDeadLetterContent(deadLetterTopic);
             assertFalse(
                     deadLetterRecords.isEmpty(),
                     deadLetterRecords.size() + " record(s) found inside dead letter topic!"

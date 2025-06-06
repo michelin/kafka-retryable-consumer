@@ -4,45 +4,29 @@
 
     <groupId>com.michelin.kafka</groupId>
     <artifactId>retryable-consumer-core</artifactId>
-    <version>0.0.18-SNAPSHOT</version>
+    <version>0.0.20-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <kafka.apache.version>3.7.0</kafka.apache.version>
+        <kafka.apache.version>4.0.0</kafka.apache.version>
         <kafka.confluent.version>7.6.0</kafka.confluent.version>
-        <kafka.stream.apache.version>3.7.0</kafka.stream.apache.version>
-        <avro.version>1.11.3</avro.version>
+        <kafka.stream.apache.version>4.0.0</kafka.stream.apache.version>
+        <avro.version>1.12.0</avro.version>
 
-        <lombok.version>1.18.28</lombok.version>
+        <lombok.version>1.18.38</lombok.version>
         <slf4j.version>2.0.9</slf4j.version>
-        <commons-io.version>2.13.0</commons-io.version>
+        <commons-io.version>2.14.0</commons-io.version>
         <commons-lang3.version>3.13.0</commons-lang3.version>
         <junit.version>5.10.1</junit.version>
         <jacoco.version>0.8.8</jacoco.version>
+        <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
+        <sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
+        <sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
+        <sonar.language>java</sonar.language>
     </properties>
-
-    <distributionManagement>
-        <repository>
-            <id>central</id>
-            <url>https://artifactory.michelin.com/kfk-mvn-release</url>
-        </repository>
-
-        <snapshotRepository>
-            <id>snapshots</id>
-            <url>https://artifactory.michelin.com/kfk-mvn-snapshot</url>
-        </snapshotRepository>
-    </distributionManagement>
-
-    <scm>
-        <url>https://gitlab.michelin.com/kafka/kafka-retryable-consumer</url>
-        <connection>scm:git:https://gitlab.michelin.com/kafka/kafka-retryable-consumer.git</connection>
-        <developerConnection>scm:git:https://gitlab.michelin.com/kafka/kafka-retryable-consumer.git</developerConnection>
-        <tag>HEAD</tag>
-    </scm>
-
 
     <dependencyManagement>
         <dependencies>
@@ -117,6 +101,12 @@
         </dependency>
 
         <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-test-common-runtime</artifactId>
+            <version>${kafka.apache.version}</version>
+        </dependency>
+
+        <dependency>
             <!--kStream dependency only used for Embedded Cluster test feature -->
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-streams-test-utils</artifactId>
@@ -126,6 +116,12 @@
             <!--kStream dependency only used for Embedded Cluster test feature -->
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-streams</artifactId>
+            <version>${kafka.stream.apache.version}</version>
+            <classifier>test</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-streams-integration-tests</artifactId>
             <version>${kafka.stream.apache.version}</version>
             <classifier>test</classifier>
         </dependency>
@@ -185,6 +181,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
+                <configuration>
+                    <argLine>-Xmx2048m</argLine>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.avro</groupId>

@@ -1,26 +1,22 @@
 package com.michelin.kafka.test.unit;
 
 import com.michelin.kafka.avro.GenericErrorModel;
-import com.michelin.kafka.configuration.DeadLetterProducerConfiguration;
 import com.michelin.kafka.error.DeadLetterProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-public class DeadLetterProducerTest {
+class DeadLetterProducerTest {
 
     @Mock
     private static Producer<String, GenericErrorModel> mockKafkaProducer;
@@ -28,7 +24,7 @@ public class DeadLetterProducerTest {
     private DeadLetterProducer deadLetterProducer;
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         MockitoAnnotations.openMocks(this);
         String dlTopic = "dlTopic";
         deadLetterProducer = new DeadLetterProducer(mockKafkaProducer, dlTopic);
@@ -36,12 +32,11 @@ public class DeadLetterProducerTest {
 
 
     @Test
-    public void shouldSendMessageSuccessfully() throws Exception {
+    void shouldSendMessageSuccessfully() {
         // Given
         String key = "key";
         GenericErrorModel errorObject = new GenericErrorModel();
-        RecordMetadata metadata = new RecordMetadata(new TopicPartition("dlTopic", 1), 1, 1, 1, Long.valueOf(1), 1, 1);
-        CompletableFuture<RecordMetadata> future = CompletableFuture.completedFuture(metadata);
+        RecordMetadata metadata = new RecordMetadata(new TopicPartition("dlTopic", 1), 1, 1, 1, 1, 1);CompletableFuture<RecordMetadata> future = CompletableFuture.completedFuture(metadata);
         when(mockKafkaProducer.send(any(ProducerRecord.class), any())).thenReturn(future);
 
         // When
@@ -52,7 +47,7 @@ public class DeadLetterProducerTest {
     }
 
     @Test
-    public void shouldHandleExceptionWhenSendingMessage() throws Exception {
+    void shouldHandleExceptionWhenSendingMessage() {
         // Given
         String key = "key";
         GenericErrorModel errorObject = new GenericErrorModel();

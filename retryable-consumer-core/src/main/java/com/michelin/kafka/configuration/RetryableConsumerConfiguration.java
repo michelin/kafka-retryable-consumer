@@ -22,29 +22,34 @@ public class RetryableConsumerConfiguration {
      * The properties are mapped according to the prefix defined in the ConfigurationProperties annotation
      * and the name of this variable.
      */
+    @Builder.Default
     private Properties properties = new Properties();
 
     /**
      * Topic
      */
+    @Builder.Default
     private Collection<String> topics = Collections.emptyList();
 
     /**
      * Not retryable exceptions
      */
+    @Builder.Default
     private Collection<String> notRetryableExceptions = Collections.emptyList();
 
     /**
      * Circuit break max retry
      */
+    @Builder.Default
     private Long retryMax = 0L;
 
     /**
      * Circuit breaker backoff between each retry
      */
+    @Builder.Default
     private Long retryBackoffMs = 0L;
 
-    private final static Long DEFAULT_POLL_BACKOFF_MS = 1000L;
+    private static final Long DEFAULT_POLL_BACKOFF_MS = 1000L;
 
     /**
      * Timeout duration in ms for polling.
@@ -52,6 +57,7 @@ public class RetryableConsumerConfiguration {
      * before stopping to poll
      * Default value is 1000 milliseconds
      */
+    @Builder.Default
     private Long pollBackoffMs = DEFAULT_POLL_BACKOFF_MS;
 
     public void loadConfigMap(Map<String, Object> retryablConsumerConfigMap) {

@@ -8,6 +8,8 @@ import java.util.*;
 
 import static com.michelin.kafka.configuration.KafkaRetryableConfiguration.PROPERTY_SEPARATOR;
 
+@Setter
+@Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -19,15 +21,12 @@ public class DeadLetterProducerConfiguration {
      * The properties are mapped according to the prefix defined in the ConfigurationProperties annotation
      * and the name of this variable.
      */
-    @Getter
-    @Setter
+    @Builder.Default
     private Properties properties = new Properties();
 
     /**
      * Dead Letter Topic
      */
-    @Getter
-    @Setter
     private String topic;
 
     public void loadConfigMap(Map<String, String> deadLetterProducerConfigMap) {

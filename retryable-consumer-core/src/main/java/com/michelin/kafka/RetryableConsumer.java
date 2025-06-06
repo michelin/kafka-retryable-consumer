@@ -8,6 +8,7 @@ import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.clients.consumer.internals.AutoOffsetResetStrategy;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.errors.WakeupException;
@@ -28,7 +29,6 @@ public class RetryableConsumer<K, V> implements Closeable {
      * The Kafka consumer itself
      */
     private final Consumer<K, V> consumer;
-
 
     /**
      * Consumer kafka configuration
@@ -54,6 +54,7 @@ public class RetryableConsumer<K, V> implements Closeable {
     private final RetryableConsumerErrorHandler<K, V> errorHandler;
 
     private int retryCounter;
+    private boolean wakeUp;
 
     /**
      * Default constructor with no parameters
@@ -177,11 +178,11 @@ public class RetryableConsumer<K, V> implements Closeable {
                 // This assigned topic partition is not present in our in memory offsets
                 // => Let's seek beginning of end of partition
                 String autoOffsetReset = (String) this.kafkaRetryableConfiguration.getConsumer().getProperties()
-                        .getOrDefault(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, OffsetResetStrategy.EARLIEST.name());
-                if (autoOffsetReset.equalsIgnoreCase(OffsetResetStrategy.EARLIEST.name())) {
+                        .getOrDefault(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, AutoOffsetResetStrategy.EARLIEST.name());
+                if (autoOffsetReset.equalsIgnoreCase(AutoOffsetResetStrategy.EARLIEST.name())) {
                     consumer.seekToBeginning(Collections.singleton(tp));
                     log.info("Seeked beginning of consumer assignment {}", tp.toString());
-                } else if (autoOffsetReset.equalsIgnoreCase(OffsetResetStrategy.LATEST.name())) {
+                } else if (autoOffsetReset.equalsIgnoreCase(AutoOffsetResetStrategy.LATEST.name())) {
                     consumer.seekToEnd(Collections.singleton(tp));
                     log.info("Seeked end of consumer assignment {}", tp.toString());
                 }
@@ -189,6 +190,12 @@ public class RetryableConsumer<K, V> implements Closeable {
         });
     }
 
+    /**
+     * This method will start a blocking Kafka the consumer that will run in background. The listened topics are the one
+     *      * in the configuration file.
+     * Warning : this method is blocker. If you need an asynchronous consumer, use listenAsync
+     * @param recordProcessor processor function to process every received records
+     */
     public void listen(RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
         if(kafkaRetryableConfiguration.getConsumer().getTopics()==null
                 || kafkaRetryableConfiguration.getConsumer().getTopics().isEmpty()) {
@@ -200,12 +207,18 @@ public class RetryableConsumer<K, V> implements Closeable {
         );
     }
 
+    /**
+     * This method will start a blocking Kafka the consumer that will run in background. The listened topics are the one
+     * in topics parameter. (Topics list of the configuration file is ignored).
+     * Warning : this method is blocker. If you need an asynchronous consumer, use listenAsync
+     * @param recordProcessor processor function to process every received records
+     */
     public void listen(Collection<String> topics,
                                RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
         try {
             consumer.subscribe(topics, this.rebalanceListener);
             this.retryCounter = 0;
-            while (true) {
+            while (!this.wakeUp) {
                 this.pollAndConsumeRecords(recordProcessor);
             }
         } catch (WakeupException e) {
@@ -216,10 +229,23 @@ public class RetryableConsumer<K, V> implements Closeable {
         }
     }
 
+    /**
+     * This method will start an asynchronous Kafka the consumer that will run in background. The listened topics are the one
+     * in the configuration file.
+     * @param recordProcessor processor function to process every received records
+     * @return A CompletableFuture of the kafka consumer listener
+     */
     public Future<Void> listenAsync(RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
         return CompletableFuture.runAsync(() -> listen(recordProcessor));
     }
 
+    /**
+     * This method will start an asynchronous Kafka the consumer that will run in background. The listened topics are the one
+     * in topics parameter. (Topics list of the configuration file is ignored)
+     * @param topics list of topics to listen to
+     * @param recordProcessor processor function to process every received records
+     * @return A CompletableFuture of the kafka consumer listener
+     */
     public Future<Void> listenAsync(
             Collection<String> topics,
             RecordProcessor<ConsumerRecord<K, V>,
@@ -242,58 +268,15 @@ public class RetryableConsumer<K, V> implements Closeable {
                 this.doCommitSync();
             }
         } catch (WakeupException w) {
+            this.wakeUp = true;
+            log.info("Wake up signal received. Getting out of the while loop", w);
             throw w;
         } catch (RecordDeserializationException e) {
             log.error("It looks like we ate a poison pill, let's skip this record!", e);
             skipCurrentOffset(e.topicPartition(),e.offset());
             errorHandler.handleConsumerDeserializationError(e);
         } catch (Exception e) {
-            log.debug("Exception occurred, running error handler processing ...", e);
-            consumer.pause(consumer.assignment());
-            if(this.currentProcessingRecord==null) {
-                //We just received a poison pills, let's skip it
-                log.error("null record received", e);
-            } else {
-                RetryableConsumerConfiguration consumerConfig = this.kafkaRetryableConfiguration.getConsumer();
-                boolean isCurrentErrorRetryable =
-                        this.retryCounter < consumerConfig.getRetryMax()
-                                || consumerConfig.getRetryMax().equals(0L);
-                if (errorHandler.isExceptionRetryable(e.getClass()) && isCurrentErrorRetryable) {
-                    log.warn(e.getMessage(), e);
-                    log.warn("Retryable exception occurred, launching retry process ... (retry number={})", retryCounter + 1);
-
-                    //Commit the latest successful offsets
-                    // => on next poll the 1st record to be consumed will be the one generating this Exception
-                    seekAndCommitToLatestSuccessfulOffset();
-
-                    //unlimited retry => we don't care about retryCounter
-                    if (!consumerConfig.getRetryMax().equals(0L)) {
-                        this.retryCounter++;
-                    }
-                } else { //not retryable : let's skip this record
-                    //FEATURE log&fail to be implemented here (right now only log&continue-skip- exists)
-
-
-
-                    // switch to next offset, so we do not loop on an unreadable record
-                    skipCurrentOffset(
-                            new TopicPartition(
-                                    this.currentProcessingRecord.topic(),
-                                    this.currentProcessingRecord.partition()
-                            ),
-                            this.currentProcessingRecord.offset());
-
-                    // Send message to DeadLetter Topic
-                    errorHandler.handleError(e, this.currentProcessingRecord);
-                    this.doCommitSync();
-                    log.debug("Committing offsets {} because of not retryable exception", offsets);
-                    if (this.retryCounter > 0) {
-                        //if we were in retry mode, and now it is in error, it means we reached the max retry
-                        this.retryCounter = 0;
-                    }
-                }
-                log.debug("Processing of record with key {} completed with error", this.currentProcessingRecord.key());
-            }
+            handleUnknownException(e);
         } finally {
             // If the consumer has been paused for any error management during event processing
             // resume it before starting the next poll loop
@@ -301,6 +284,53 @@ public class RetryableConsumer<K, V> implements Closeable {
                 log.debug("Consumer was paused, resuming topic-partitions {}", consumer.assignment());
                 consumer.resume(consumer.assignment());
             }
+        }
+    }
+
+    private void handleUnknownException(Exception e) {
+        log.debug("Exception occurred, running error handler processing ...", e);
+        consumer.pause(consumer.assignment());
+        if(this.currentProcessingRecord==null) {
+            //We just received a poison pills, let's skip it
+            log.error("null record received", e);
+        } else {
+            RetryableConsumerConfiguration consumerConfig = this.kafkaRetryableConfiguration.getConsumer();
+            boolean isCurrentErrorRetryable =
+                    this.retryCounter < consumerConfig.getRetryMax()
+                            || consumerConfig.getRetryMax().equals(0L);
+            if (errorHandler.isExceptionRetryable(e.getClass()) && isCurrentErrorRetryable) {
+                log.warn(e.getMessage(), e);
+                log.warn("Retryable exception occurred, launching retry process ... (retry number={})", retryCounter + 1);
+
+                //Commit the latest successful offsets
+                // => on next poll the 1st record to be consumed will be the one generating this Exception
+                seekAndCommitToLatestSuccessfulOffset();
+
+                //unlimited retry => we don't care about retryCounter
+                if (!consumerConfig.getRetryMax().equals(0L)) {
+                    this.retryCounter++;
+                }
+            } else { //not retryable : let's skip this record
+                //FEATURE log&fail to be implemented here (right now only log&continue-skip- exists)
+
+                // switch to next offset, so we do not loop on an unreadable record
+                skipCurrentOffset(
+                        new TopicPartition(
+                                this.currentProcessingRecord.topic(),
+                                this.currentProcessingRecord.partition()
+                        ),
+                        this.currentProcessingRecord.offset());
+
+                // Send message to DeadLetter Topic
+                errorHandler.handleError(e, this.currentProcessingRecord);
+                this.doCommitSync();
+                log.debug("Committing offsets {} because of not retryable exception", offsets);
+                if (this.retryCounter > 0) {
+                    //if we were in retry mode, and now it is in error, it means we reached the max retry
+                    this.retryCounter = 0;
+                }
+            }
+            log.debug("Processing of record with key {} completed with error", this.currentProcessingRecord.key());
         }
     }
 
