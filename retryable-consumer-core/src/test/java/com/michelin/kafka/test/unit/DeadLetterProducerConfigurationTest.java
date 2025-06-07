@@ -72,7 +72,7 @@ class DeadLetterProducerConfigurationTest {
     }
 
     @Test
-    oid testLoadConfigProperties_withPrefix() {
+    void testLoadConfigProperties_withPrefix() {
         // Given
         String configurationPrefix = "testPrefix";
         Properties retryablConsumerConfigProperties = new Properties();
