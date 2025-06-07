@@ -63,7 +63,7 @@ public class EmbeddedClusterTest {
     }
 
     @AfterAll
-     static void teardown() {
+    static void teardown() {
         embeddedCluster.stop();
     }
 
