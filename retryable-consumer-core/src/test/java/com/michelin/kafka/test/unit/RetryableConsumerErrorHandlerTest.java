@@ -1,8 +1,35 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package com.michelin.kafka.test.unit;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 import com.michelin.kafka.avro.GenericErrorModel;
 import com.michelin.kafka.error.DeadLetterProducer;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.record.TimestampType;
@@ -13,17 +40,6 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.io.*;
-import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.util.Arrays;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
-
 class RetryableConsumerErrorHandlerTest {
 
     @Captor
@@ -31,9 +47,7 @@ class RetryableConsumerErrorHandlerTest {
 
     @Captor
     private ArgumentCaptor<GenericErrorModel> valueCaptor;
-    /**
-     * Shared test Dead Letter Topic consumer configuration
-     */
+    /** Shared test Dead Letter Topic consumer configuration */
     @Mock
     private static DeadLetterProducer mockDeadLetterProducer;
 
@@ -44,11 +58,14 @@ class RetryableConsumerErrorHandlerTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        List<String> notRetryableExceptions = Arrays.asList("java.lang.IllegalArgumentException", "java.lang.NullPointerException");
+        List<String> notRetryableExceptions =
+                Arrays.asList("java.lang.IllegalArgumentException", "java.lang.NullPointerException");
         doNothing().when(mockDeadLetterProducer).send(any(), any());
         errorHandler = new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
-        serializableObjectErrorHandler = new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
-        serializableObjectKeyErrorHandler = new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
+        serializableObjectErrorHandler =
+                new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
+        serializableObjectKeyErrorHandler =
+                new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
     }
 
     @Test
@@ -95,8 +112,7 @@ class RetryableConsumerErrorHandlerTest {
                 ByteBuffer.wrap("Test Value".getBytes()),
                 null,
                 "Test message",
-                null
-        );
+                null);
         assertDoesNotThrow(() -> errorHandler.handleConsumerDeserializationError(exception));
     }
 
@@ -112,12 +128,10 @@ class RetryableConsumerErrorHandlerTest {
                 ByteBuffer.wrap("Test Value".getBytes()),
                 null,
                 "Test message",
-                null
-        );
+                null);
 
         assertThrows(NullPointerException.class, () -> errorHandler.handleConsumerDeserializationError(exception));
     }
-
 
     @Test
     void shouldHandleErrorWhenAllParametersAreNotNull() {
@@ -237,7 +251,6 @@ class RetryableConsumerErrorHandlerTest {
         assertNotNull(capturedErrorModel.getByteKey()); // Check that ByteKey is not null when key is not a String
     }
 
-
     @Test
     void testToByteBuffer() throws IOException, ClassNotFoundException {
         // Arrange
@@ -262,7 +275,8 @@ class RetryableConsumerErrorHandlerTest {
 
         List<String> exceptionNames = Arrays.asList("java.lang.Exception", "java.io.IOException");
 
-        List<Class<? extends Exception>> exceptions = RetryableConsumerErrorHandler.convertStringToException(exceptionNames);
+        List<Class<? extends Exception>> exceptions =
+                RetryableConsumerErrorHandler.convertStringToException(exceptionNames);
 
         assertEquals(2, exceptions.size());
         assertTrue(exceptions.contains(Exception.class));
@@ -274,8 +288,9 @@ class RetryableConsumerErrorHandlerTest {
 
         List<String> exceptionNames = List.of("java.lang.NonExistentClass");
 
-
-        assertThrows(IllegalArgumentException.class, () -> RetryableConsumerErrorHandler.convertStringToException(exceptionNames));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> RetryableConsumerErrorHandler.convertStringToException(exceptionNames));
     }
 
     @Test
@@ -283,8 +298,8 @@ class RetryableConsumerErrorHandlerTest {
 
         List<String> exceptionNames = List.of("java.lang.String");
 
-        assertThrows(IllegalArgumentException.class, () -> RetryableConsumerErrorHandler.convertStringToException(exceptionNames));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> RetryableConsumerErrorHandler.convertStringToException(exceptionNames));
     }
-
-
 }
