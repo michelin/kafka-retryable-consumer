@@ -72,12 +72,12 @@ jobs:
           severity-cutoff: high
           only-fixed: true
 
-      - name: Upload Grype source code report
-        if: always() && steps.grype_source_code.outputs.sarif != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ steps.grype_source_code.outputs.sarif }}
-          category: 'source-code'
+#      - name: Upload Grype source code report
+#        if: always() && steps.grype_source_code.outputs.sarif != ''
+#        uses: github/codeql-action/upload-sarif@v3
+#        with:
+#          sarif_file: ${{ steps.grype_source_code.outputs.sarif }}
+#          category: 'source-code'
 
       - name: Sonar
         if: matrix.java == '17' && github.event.pull_request.head.repo.fork == false
