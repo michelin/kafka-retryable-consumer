@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".readme/logo.png" alt="KafkaRertryableConsumer"/>
+<img src=".readme/logo-color.svg" alt="KafkaRertryableConsumer"/>
 
 # Kafka Retryable Consumer
 
