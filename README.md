@@ -12,8 +12,6 @@
 [![SonarCloud Tests](https://img.shields.io/sonar/tests/michelin_kafka-retryable-consumer/main?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&logo=sonarcloud)](https://sonarcloud.io/component_measures?metric=tests&view=list&id=michelin_kafka-retryable-consumer)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?logo=apache&style=for-the-badge)](https://opensource.org/licenses/Apache-2.0)
 
-[Download](#download) • [Install](#install) • [Kafkactl](https://github.com/michelin/kafkactl)
-
 Simple Kafka consumer library with retry capabilities.
 
 Retryable Consumer Libraries, allow you to easily build a Kafka API consumer with retry capabilities.
