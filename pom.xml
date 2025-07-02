@@ -53,6 +53,8 @@
     <properties>
         <avro-maven-plugin.version>1.12.0</avro-maven-plugin.version>
         <avro.version>1.12.0</avro.version>
+
+        <central-publishing-maven-plugin.version>0.8.0</central-publishing-maven-plugin.version>
         <commons-io.version>2.14.0</commons-io.version>
         <commons-lang3.version>3.13.0</commons-lang3.version>
         <jacoco.version>0.8.8</jacoco.version>
@@ -76,8 +78,6 @@
         <sonar.organization>michelin</sonar.organization>
         <sonar.projectKey>michelin_kafka-retryable-consumer</sonar.projectKey>
         <spotless-maven-plugin.version>2.44.5</spotless-maven-plugin.version>
-
-        <central-publishing-maven-plugin.version>0.8.0</central-publishing-maven-plugin.version>
     </properties>
 
     <dependencies>
