@@ -26,7 +26,7 @@ If no open issue addresses your problem, please open a new one and include:
 
 ### Pull Requests
 
-To contribute to Ns4Kafka:
+To contribute to Retryable Consumer Core:
 
 - Fork the repository to your own GitHub account
 - Clone the project to your machine
