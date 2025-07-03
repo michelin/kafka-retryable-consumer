@@ -97,4 +97,4 @@ jobs:
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_TOKEN: ${{ secrets.SONATYPE_TOKEN }}
-          MICHELINBOT_GPG_PASSPHRASE: ${{ secrets.MICHELINBOT_GPG_PASSPHRASE }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MICHELINBOT_GPG_PASSPHRASE }}
