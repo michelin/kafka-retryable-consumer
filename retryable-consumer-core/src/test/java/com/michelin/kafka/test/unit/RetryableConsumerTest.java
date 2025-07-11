@@ -70,7 +70,6 @@ class RetryableConsumerTest {
     private final long record1Offset = 1L;
     private final TopicPartition record1TopicPartition = new TopicPartition(topic, record1Partition);
 
-
     @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);

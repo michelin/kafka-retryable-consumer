@@ -1,4 +1,25 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package com.michelin.kafka.test.unit;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 import com.michelin.kafka.RecordProcessor;
 import com.michelin.kafka.RetryableConsumer;
@@ -6,6 +27,9 @@ import com.michelin.kafka.RetryableConsumerRebalanceListener;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
+import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.util.Collections;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -19,13 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
-import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.util.Collections;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 public class RetryableConsumerRetryTest {
 
@@ -62,12 +79,12 @@ public class RetryableConsumerRetryTest {
     private final long record2Offset = 2L;
     private final TopicPartition record2TopicPartition = new TopicPartition(topic, record2Partition);
 
-
     @BeforeEach
     void setUp() throws Exception {
         MockitoAnnotations.openMocks(this);
 
-        when(errorHandler.isExceptionRetryable(RetryableConsumerTest.CustomRetryableException.class)).thenReturn(true);
+        when(errorHandler.isExceptionRetryable(RetryableConsumerTest.CustomRetryableException.class))
+                .thenReturn(true);
         when(errorHandler.isExceptionRetryable(RetryableConsumerTest.CustomNotRetryableException.class))
                 .thenReturn(false);
 
@@ -77,16 +94,16 @@ public class RetryableConsumerRetryTest {
 
         doNothing().when(recordProcessorNoError).processRecord(any());
         doThrow(new RecordDeserializationException(
-                RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
-                record1TopicPartition,
-                record1Offset,
-                Instant.now().toEpochMilli(),
-                TimestampType.NO_TIMESTAMP_TYPE,
-                ByteBuffer.wrap("Test Key".getBytes()),
-                ByteBuffer.wrap("Test Value".getBytes()),
-                null,
-                "Fake DeSer Error",
-                new Exception()))
+                        RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
+                        record1TopicPartition,
+                        record1Offset,
+                        Instant.now().toEpochMilli(),
+                        TimestampType.NO_TIMESTAMP_TYPE,
+                        ByteBuffer.wrap("Test Key".getBytes()),
+                        ByteBuffer.wrap("Test Value".getBytes()),
+                        null,
+                        "Fake DeSer Error",
+                        new Exception()))
                 .when(recordProcessorDeserializationError)
                 .processRecord(any());
 
@@ -115,17 +132,19 @@ public class RetryableConsumerRetryTest {
                                 Collections.singletonMap(record1TopicPartition, Collections.singletonList(record1)),
                                 Collections.singletonMap(
                                         record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                        ))
+                                ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.singletonMap(record2TopicPartition, Collections.singletonList(record2)),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                ))
+                        ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.emptyMap(),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                )); // all subsequent calls return empty record list
+                        )); // all subsequent calls return empty record list
 
-        doThrow(new RetryableConsumerTest.CustomNotRetryableException()).when(recordProcessorNoError).processRecord(record2);
+        doThrow(new RetryableConsumerTest.CustomNotRetryableException())
+                .when(recordProcessorNoError)
+                .processRecord(record2);
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
         verify(kafkaConsumer, timeout(5000).atLeastOnce()).poll(any());
@@ -151,17 +170,19 @@ public class RetryableConsumerRetryTest {
                                 Collections.singletonMap(record1TopicPartition, Collections.singletonList(record1)),
                                 Collections.singletonMap(
                                         record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                        ))
+                                ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.singletonMap(record2TopicPartition, Collections.singletonList(record2)),
                         Collections.singletonMap(record2TopicPartition, new OffsetAndMetadata(1L)) // next records
-                ))
+                        ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.emptyMap(),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next record
-                )); // all subsequent calls return empty record list
+                        )); // all subsequent calls return empty record list
 
-        doThrow(new RetryableConsumerTest.CustomRetryableException()).when(recordProcessorNoError).processRecord(record2);
+        doThrow(new RetryableConsumerTest.CustomRetryableException())
+                .when(recordProcessorNoError)
+                .processRecord(record2);
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
 
@@ -178,7 +199,6 @@ public class RetryableConsumerRetryTest {
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset);
     }
 
-
     @Test
     void listenAsync_shouldHandleDeserializationException() throws Exception {
         ConsumerRecord<String, String> consumerRecord =
@@ -191,23 +211,23 @@ public class RetryableConsumerRetryTest {
                                         record1TopicPartition, Collections.singletonList(consumerRecord)),
                                 Collections.singletonMap(
                                         record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                        ))
+                                ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.emptyMap(),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                )); // all subsequent calls return empty record list
+                        )); // all subsequent calls return empty record list
 
         doThrow(new RecordDeserializationException(
-                RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
-                record1TopicPartition,
-                record1Offset,
-                Instant.now().toEpochMilli(),
-                TimestampType.NO_TIMESTAMP_TYPE,
-                ByteBuffer.wrap("Test Key".getBytes()),
-                ByteBuffer.wrap("Test Value".getBytes()),
-                null,
-                "Fake DeSer Error",
-                new Exception()))
+                        RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
+                        record1TopicPartition,
+                        record1Offset,
+                        Instant.now().toEpochMilli(),
+                        TimestampType.NO_TIMESTAMP_TYPE,
+                        ByteBuffer.wrap("Test Key".getBytes()),
+                        ByteBuffer.wrap("Test Value".getBytes()),
+                        null,
+                        "Fake DeSer Error",
+                        new Exception()))
                 .when(recordProcessorNoError)
                 .processRecord(any());
 
