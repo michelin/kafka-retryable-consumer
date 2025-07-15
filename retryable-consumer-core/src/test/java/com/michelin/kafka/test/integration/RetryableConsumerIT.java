@@ -42,7 +42,7 @@ import org.junit.jupiter.api.*;
 
 @Slf4j
 @Timeout(15)
-public class RetryableConsumerIntegrationTest {
+public class RetryableConsumerIT {
 
     /** Default timeout used by various Kafka consumer to wait for new message in a topic */
     private static final Long DEFAULT_TOPIC_CONSUMPTION_TIMEOUT_MS = 10000L;
