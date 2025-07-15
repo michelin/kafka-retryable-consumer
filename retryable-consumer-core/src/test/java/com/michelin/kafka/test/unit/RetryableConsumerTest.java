@@ -125,7 +125,8 @@ class RetryableConsumerTest {
                         Collections.emptyMap(),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))));
 
-        retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
+        //retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
+        retryableConsumer.listen(r -> recordProcessorNoError.processRecord(r));
         verify(kafkaConsumer, timeout(10000).atLeast(1)).poll(any());
         verify(recordProcessorNoError, timeout(10000).times(1)).processRecord(any());
 
