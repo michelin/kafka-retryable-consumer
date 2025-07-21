@@ -26,10 +26,14 @@ import com.michelin.kafka.RetryableConsumerRebalanceListener;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
+import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.Collections;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.RecordDeserializationException;
+import org.apache.kafka.common.record.TimestampType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,6 +88,19 @@ class RetryableConsumerTest {
         when(consumerConfiguration.getTopics()).thenReturn(Collections.singletonList(topic));
 
         doNothing().when(recordProcessorNoError).processRecord(any());
+        doThrow(new RecordDeserializationException(
+                        RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
+                        record1TopicPartition,
+                        record1Offset,
+                        Instant.now().toEpochMilli(),
+                        TimestampType.NO_TIMESTAMP_TYPE,
+                        ByteBuffer.wrap("Test Key".getBytes()),
+                        ByteBuffer.wrap("Test Value".getBytes()),
+                        null,
+                        "Fake DeSer Error",
+                        new Exception()))
+                .when(recordProcessorDeserializationError)
+                .processRecord(any());
 
         retryableConsumer =
                 new RetryableConsumer<>(retryableConfiguration, kafkaConsumer, errorHandler, rebalanceListener);
@@ -112,13 +129,8 @@ class RetryableConsumerTest {
                 .thenReturn(new ConsumerRecords<>(
                         Collections.emptyMap(),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))));
-        log.info("Waiting for mock to be ready for the first poll");
-        Thread.sleep(10000); // Add delay to ensure Mock is ready for the next poll
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
-
-        Thread.sleep(10000); // Add delay to ensure Mock is ready for the next poll
-
         verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
         verify(recordProcessorNoError, timeout(5000).times(1)).processRecord(any());
         Assertions.assertEquals(
