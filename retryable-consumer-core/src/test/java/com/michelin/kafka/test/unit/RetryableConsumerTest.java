@@ -128,7 +128,7 @@ class RetryableConsumerTest {
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
         verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
         verify(recordProcessorNoError, timeout(5000).times(1)).processRecord(any());
-
+        retryableConsumer.stop();
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
     }
