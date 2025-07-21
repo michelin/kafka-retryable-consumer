@@ -116,6 +116,9 @@ class RetryableConsumerTest {
         Thread.sleep(10000); // Add delay to ensure Mock is ready for the next poll
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
+
+        Thread.sleep(10000); // Add delay to ensure Mock is ready for the next poll
+
         verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
         verify(recordProcessorNoError, timeout(5000).times(1)).processRecord(any());
         Assertions.assertEquals(
