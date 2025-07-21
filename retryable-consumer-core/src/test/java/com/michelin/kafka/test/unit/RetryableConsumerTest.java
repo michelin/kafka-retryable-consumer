@@ -34,10 +34,7 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.record.TimestampType;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -120,6 +117,7 @@ class RetryableConsumerTest {
     }
 
     @Test
+    @Order(1)
     void listenAsync_shouldProcessRecords() throws Exception {
         log.info("Launching test: listenAsync_shouldProcessRecords");
         ConsumerRecord<String, String> consumerRecord =
@@ -142,6 +140,7 @@ class RetryableConsumerTest {
     }
 
     @Test
+    @Order(2)
     void listenAsync_shouldHandleNotRetryableError() throws Exception {
         ConsumerRecord<String, String> record1 =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
@@ -155,15 +154,15 @@ class RetryableConsumerTest {
                                 Collections.singletonMap(record1TopicPartition, Collections.singletonList(record1)),
                                 Collections.singletonMap(
                                         record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                        ))
+                                ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.singletonMap(record2TopicPartition, Collections.singletonList(record2)),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                ))
+                        ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.emptyMap(),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                )); // all subsequent calls return empty record list
+                        )); // all subsequent calls return empty record list
 
         doThrow(new RetryableConsumerTest.CustomNotRetryableException())
                 .when(recordProcessorNoError)
@@ -180,6 +179,7 @@ class RetryableConsumerTest {
     }
 
     @Test
+    @Order(3)
     void listenAsync_shouldHandleInfiniteRetryableError() throws Exception {
         ConsumerRecord<String, String> record1 =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
@@ -193,15 +193,15 @@ class RetryableConsumerTest {
                                 Collections.singletonMap(record1TopicPartition, Collections.singletonList(record1)),
                                 Collections.singletonMap(
                                         record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                        ))
+                                ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.singletonMap(record2TopicPartition, Collections.singletonList(record2)),
                         Collections.singletonMap(record2TopicPartition, new OffsetAndMetadata(1L)) // next records
-                ))
+                        ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.emptyMap(),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next record
-                )); // all subsequent calls return empty record list
+                        )); // all subsequent calls return empty record list
 
         doThrow(new RetryableConsumerTest.CustomRetryableException())
                 .when(recordProcessorNoError)
@@ -223,6 +223,7 @@ class RetryableConsumerTest {
     }
 
     @Test
+    @Order(4)
     void listenAsync_shouldHandleDeserializationException() throws Exception {
         ConsumerRecord<String, String> consumerRecord =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
@@ -234,23 +235,23 @@ class RetryableConsumerTest {
                                         record1TopicPartition, Collections.singletonList(consumerRecord)),
                                 Collections.singletonMap(
                                         record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                        ))
+                                ))
                 .thenReturn(new ConsumerRecords<>(
                         Collections.emptyMap(),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
-                )); // all subsequent calls return empty record list
+                        )); // all subsequent calls return empty record list
 
         doThrow(new RecordDeserializationException(
-                RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
-                record1TopicPartition,
-                record1Offset,
-                Instant.now().toEpochMilli(),
-                TimestampType.NO_TIMESTAMP_TYPE,
-                ByteBuffer.wrap("Test Key".getBytes()),
-                ByteBuffer.wrap("Test Value".getBytes()),
-                null,
-                "Fake DeSer Error",
-                new Exception()))
+                        RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
+                        record1TopicPartition,
+                        record1Offset,
+                        Instant.now().toEpochMilli(),
+                        TimestampType.NO_TIMESTAMP_TYPE,
+                        ByteBuffer.wrap("Test Key".getBytes()),
+                        ByteBuffer.wrap("Test Value".getBytes()),
+                        null,
+                        "Fake DeSer Error",
+                        new Exception()))
                 .when(recordProcessorNoError)
                 .processRecord(any());
 
