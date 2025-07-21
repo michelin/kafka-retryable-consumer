@@ -69,10 +69,14 @@ class RetryableConsumerTest {
 
     private AutoCloseable closeable;
 
-    private final String topic = "topic";
+    private final String topic = "retryable-cons-test-topic";
     private final int record1Partition = 1;
     private final long record1Offset = 1L;
     private final TopicPartition record1TopicPartition = new TopicPartition(topic, record1Partition);
+
+    private final int record2Partition = 1;
+    private final long record2Offset = 2L;
+    private final TopicPartition record2TopicPartition = new TopicPartition(topic, record2Partition);
 
     @BeforeEach
     void setUp() throws Exception {
@@ -133,6 +137,131 @@ class RetryableConsumerTest {
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
         verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
         verify(recordProcessorNoError, timeout(5000).times(1)).processRecord(any());
+        Assertions.assertEquals(
+                retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
+    }
+
+    @Test
+    void listenAsync_shouldHandleNotRetryableError() throws Exception {
+        ConsumerRecord<String, String> record1 =
+                new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
+
+        ConsumerRecord<String, String> record2 =
+                new ConsumerRecord<>(topic, record2Partition, record2Offset, "key2", "value2");
+
+        when(kafkaConsumer.poll(any()))
+                .thenReturn( // First poll return one record
+                        new ConsumerRecords<>(
+                                Collections.singletonMap(record1TopicPartition, Collections.singletonList(record1)),
+                                Collections.singletonMap(
+                                        record1TopicPartition, new OffsetAndMetadata(1L)) // next records
+                        ))
+                .thenReturn(new ConsumerRecords<>(
+                        Collections.singletonMap(record2TopicPartition, Collections.singletonList(record2)),
+                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
+                ))
+                .thenReturn(new ConsumerRecords<>(
+                        Collections.emptyMap(),
+                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
+                )); // all subsequent calls return empty record list
+
+        doThrow(new RetryableConsumerTest.CustomNotRetryableException())
+                .when(recordProcessorNoError)
+                .processRecord(record2);
+
+        retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
+        verify(kafkaConsumer, timeout(5000).atLeastOnce()).poll(any());
+        verify(errorHandler, timeout(5000).times(1)).handleError(any(), any());
+
+        // Not retryable error : Check we have correctly skipped the record
+        Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
+        Assertions.assertEquals(
+                retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset + 1);
+    }
+
+    @Test
+    void listenAsync_shouldHandleInfiniteRetryableError() throws Exception {
+        ConsumerRecord<String, String> record1 =
+                new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
+
+        ConsumerRecord<String, String> record2 =
+                new ConsumerRecord<>(topic, record2Partition, record2Offset, "key2", "value2");
+
+        when(kafkaConsumer.poll(any()))
+                .thenReturn( // First poll return one record
+                        new ConsumerRecords<>(
+                                Collections.singletonMap(record1TopicPartition, Collections.singletonList(record1)),
+                                Collections.singletonMap(
+                                        record1TopicPartition, new OffsetAndMetadata(1L)) // next records
+                        ))
+                .thenReturn(new ConsumerRecords<>(
+                        Collections.singletonMap(record2TopicPartition, Collections.singletonList(record2)),
+                        Collections.singletonMap(record2TopicPartition, new OffsetAndMetadata(1L)) // next records
+                ))
+                .thenReturn(new ConsumerRecords<>(
+                        Collections.emptyMap(),
+                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next record
+                )); // all subsequent calls return empty record list
+
+        doThrow(new RetryableConsumerTest.CustomRetryableException())
+                .when(recordProcessorNoError)
+                .processRecord(record2);
+
+        retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
+
+        // Check we continuously call poll
+        verify(kafkaConsumer, timeout(5000).atLeast(3)).poll(any());
+
+        // check we do not send anything in DLQ because of infinite retry
+        verify(errorHandler, timeout(5000).times(0)).handleError(any(), any());
+        verify(errorHandler, timeout(5000).times(0)).handleError(any(), any(), any());
+
+        // Retryable error : Check we store correctly the offset of second record only
+        Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
+        Assertions.assertEquals(
+                retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset);
+    }
+
+    @Test
+    void listenAsync_shouldHandleDeserializationException() throws Exception {
+        ConsumerRecord<String, String> consumerRecord =
+                new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
+
+        when(kafkaConsumer.poll(any()))
+                .thenReturn( // First poll return one record
+                        new ConsumerRecords<>(
+                                Collections.singletonMap(
+                                        record1TopicPartition, Collections.singletonList(consumerRecord)),
+                                Collections.singletonMap(
+                                        record1TopicPartition, new OffsetAndMetadata(1L)) // next records
+                        ))
+                .thenReturn(new ConsumerRecords<>(
+                        Collections.emptyMap(),
+                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
+                )); // all subsequent calls return empty record list
+
+        doThrow(new RecordDeserializationException(
+                RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
+                record1TopicPartition,
+                record1Offset,
+                Instant.now().toEpochMilli(),
+                TimestampType.NO_TIMESTAMP_TYPE,
+                ByteBuffer.wrap("Test Key".getBytes()),
+                ByteBuffer.wrap("Test Value".getBytes()),
+                null,
+                "Fake DeSer Error",
+                new Exception()))
+                .when(recordProcessorNoError)
+                .processRecord(any());
+
+        retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
+        verify(kafkaConsumer, timeout(5000).atLeast(2)).poll(any());
+
+        // Check the record is sent to DLQ
+        verify(errorHandler, timeout(5000).times(1)).handleConsumerDeserializationError(any());
+
+        // Check we have correctly skipped the record
+        Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
     }
