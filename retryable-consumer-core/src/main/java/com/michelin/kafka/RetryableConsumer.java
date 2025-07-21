@@ -218,6 +218,7 @@ public class RetryableConsumer<K, V> implements Closeable {
      * @param recordProcessor processor function to process every received records
      */
     public void listen(Collection<String> topics, RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
+        log.info("Starting consumer for topics {}", topics);
         try {
             consumer.subscribe(topics, this.rebalanceListener);
             this.retryCounter = 0;
@@ -257,12 +258,13 @@ public class RetryableConsumer<K, V> implements Closeable {
     }
 
     private void pollAndConsumeRecords(RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
+        log.info("Starting polling ...");
         try {
             ConsumerRecords<K, V> records = consumer.poll(Duration.ofMillis(
                     this.kafkaRetryableConfiguration.getConsumer().getPollBackoffMs()));
             log.debug("Pulled {} records", records.count());
             if (records.count() > 0) {
-                log.info("Processing records");
+                log.info("Processing records in processor {}", recordProcessor.getClass().getName());
                 processRecords(recordProcessor, records);
                 this.doCommitSync();
             }
@@ -283,6 +285,7 @@ public class RetryableConsumer<K, V> implements Closeable {
                 log.debug("Consumer was paused, resuming topic-partitions {}", consumer.assignment());
                 consumer.resume(consumer.assignment());
             }
+            log.info("Polling for records finished, consumer is ready for next poll");
         }
     }
 
