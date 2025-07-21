@@ -29,7 +29,6 @@ import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
-
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
