@@ -39,6 +39,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 @Slf4j
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class RetryableConsumerTest {
     @Mock
     private KafkaConsumer<String, String> kafkaConsumer;
