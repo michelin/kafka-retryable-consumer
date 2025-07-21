@@ -76,8 +76,8 @@ class RetryableConsumerTest {
     private final TopicPartition record2TopicPartition = new TopicPartition(topic, record2Partition);
 
     @BeforeEach
-    void setUp() throws Exception {
-        log.info("Setting up RetryableConsumerTest - beforeEach");
+    void setUp(TestInfo testInfo) throws Exception {
+        log.info("Setting up RetryableConsumerTest for test : {}", testInfo.getDisplayName());
         closeableMocks = MockitoAnnotations.openMocks(this);
 
         when(errorHandler.isExceptionRetryable(CustomRetryableException.class)).thenReturn(true);
@@ -108,8 +108,8 @@ class RetryableConsumerTest {
     }
 
     @AfterEach
-    void teardown() throws Exception {
-        log.info("Tearing down RetryableConsumerTest - afterEach");
+    void teardown(TestInfo testInfo) throws Exception {
+        log.info("Tearing down RetryableConsumerTest for test : {}", testInfo.getDisplayName());
         if (retryableConsumer != null) {
             retryableConsumer.close();
         }
