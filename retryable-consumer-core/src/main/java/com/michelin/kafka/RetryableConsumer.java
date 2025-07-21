@@ -258,7 +258,6 @@ public class RetryableConsumer<K, V> implements Closeable {
     }
 
     private void pollAndConsumeRecords(RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
-        log.info("Starting polling ...");
         try {
             ConsumerRecords<K, V> records = consumer.poll(Duration.ofMillis(
                     this.kafkaRetryableConfiguration.getConsumer().getPollBackoffMs()));
@@ -287,7 +286,6 @@ public class RetryableConsumer<K, V> implements Closeable {
                 log.debug("Consumer was paused, resuming topic-partitions {}", consumer.assignment());
                 consumer.resume(consumer.assignment());
             }
-            log.info("Polling for records finished, consumer is ready for next poll");
         }
     }
 

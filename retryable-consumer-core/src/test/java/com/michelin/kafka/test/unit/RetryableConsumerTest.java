@@ -88,19 +88,6 @@ class RetryableConsumerTest {
         when(consumerConfiguration.getTopics()).thenReturn(Collections.singletonList(topic));
 
         doNothing().when(recordProcessorNoError).processRecord(any());
-        doThrow(new RecordDeserializationException(
-                        RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
-                        record1TopicPartition,
-                        record1Offset,
-                        Instant.now().toEpochMilli(),
-                        TimestampType.NO_TIMESTAMP_TYPE,
-                        ByteBuffer.wrap("Test Key".getBytes()),
-                        ByteBuffer.wrap("Test Value".getBytes()),
-                        null,
-                        "Fake DeSer Error",
-                        new Exception()))
-                .when(recordProcessorDeserializationError)
-                .processRecord(any());
 
         retryableConsumer =
                 new RetryableConsumer<>(retryableConfiguration, kafkaConsumer, errorHandler, rebalanceListener);
