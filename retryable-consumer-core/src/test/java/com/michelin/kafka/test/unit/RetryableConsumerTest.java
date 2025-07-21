@@ -64,7 +64,7 @@ class RetryableConsumerTest {
     @Mock
     RecordProcessor<ConsumerRecord<String, String>, Exception> recordProcessorDeserializationError;
 
-    private AutoCloseable closeable;
+    private AutoCloseable closeableMocks;
 
     private final String topic = "retryable-cons-test-topic";
     private final int record1Partition = 1;
@@ -78,7 +78,7 @@ class RetryableConsumerTest {
     @BeforeEach
     void setUp() throws Exception {
         log.info("Setting up RetryableConsumerTest - beforeEach");
-        closeable = MockitoAnnotations.openMocks(this);
+        closeableMocks = MockitoAnnotations.openMocks(this);
 
         when(errorHandler.isExceptionRetryable(CustomRetryableException.class)).thenReturn(true);
         when(errorHandler.isExceptionRetryable(CustomNotRetryableException.class))
@@ -113,7 +113,7 @@ class RetryableConsumerTest {
         if (retryableConsumer != null) {
             retryableConsumer.close();
         }
-        closeable.close();
+        closeableMocks.close();
     }
 
     @Test
