@@ -29,6 +29,8 @@ import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
+
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
@@ -40,6 +42,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+@Slf4j
 class RetryableConsumerTest {
     @Mock
     private KafkaConsumer<String, String> kafkaConsumer;
@@ -74,6 +77,7 @@ class RetryableConsumerTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        log.info("Setting up RetryableConsumerTest - beforeEach");
         closeable = MockitoAnnotations.openMocks(this);
 
         when(errorHandler.isExceptionRetryable(CustomRetryableException.class)).thenReturn(true);
@@ -105,6 +109,7 @@ class RetryableConsumerTest {
 
     @AfterEach
     void teardown() throws Exception {
+        log.info("Tearing down RetryableConsumerTest - afterEach");
         if (retryableConsumer != null) {
             retryableConsumer.close();
         }
@@ -113,6 +118,7 @@ class RetryableConsumerTest {
 
     @Test
     void listenAsync_shouldProcessRecords() throws Exception {
+        log.info("Launching test: listenAsync_shouldProcessRecords");
         ConsumerRecord<String, String> consumerRecord =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
 
@@ -126,10 +132,8 @@ class RetryableConsumerTest {
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))));
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
-        Thread.sleep(200);
         verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
         verify(recordProcessorNoError, timeout(5000).times(1)).processRecord(any());
-        retryableConsumer.stop();
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
     }
