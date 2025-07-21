@@ -112,6 +112,8 @@ class RetryableConsumerTest {
                 .thenReturn(new ConsumerRecords<>(
                         Collections.emptyMap(),
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))));
+        log.info("Waiting for mock to be ready for the first poll");
+        Thread.sleep(10000); // Add delay to ensure Mock is ready for the next poll
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
         verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
