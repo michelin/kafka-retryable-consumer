@@ -126,6 +126,7 @@ class RetryableConsumerTest {
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))));
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
+        Thread.sleep(200);
         verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
         verify(recordProcessorNoError, timeout(5000).times(1)).processRecord(any());
         retryableConsumer.stop();
