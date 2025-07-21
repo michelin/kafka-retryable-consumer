@@ -264,7 +264,9 @@ public class RetryableConsumer<K, V> implements Closeable {
                     this.kafkaRetryableConfiguration.getConsumer().getPollBackoffMs()));
             log.debug("Pulled {} records", records.count());
             if (records.count() > 0) {
-                log.info("Processing records in processor {}", recordProcessor.getClass().getName());
+                log.info(
+                        "Processing records in processor {}",
+                        recordProcessor.getClass().getName());
                 processRecords(recordProcessor, records);
                 this.doCommitSync();
             }
