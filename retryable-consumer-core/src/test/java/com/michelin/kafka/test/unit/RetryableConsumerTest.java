@@ -113,7 +113,6 @@ class RetryableConsumerTest {
         if (retryableConsumer != null) {
             retryableConsumer.close();
         }
-        closeableMocks.close();
     }
 
     @Test
