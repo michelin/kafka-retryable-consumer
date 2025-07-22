@@ -6,9 +6,9 @@
         <artifactId>kafka-retryable-consumer</artifactId>
         <version>1.0.0</version>
     </parent>
+    <artifactId>retryable-consumer-core</artifactId>
 
     <name>kafka-retryable-consumer-core</name>
-    <artifactId>retryable-consumer-core</artifactId>
 
     <build>
         <plugins>
