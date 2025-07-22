@@ -33,6 +33,7 @@ import java.util.List;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.record.TimestampType;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -55,9 +56,11 @@ class RetryableConsumerErrorHandlerTest {
     private RetryableConsumerErrorHandler<String, SerializableObject> serializableObjectErrorHandler;
     private RetryableConsumerErrorHandler<SerializableObject, String> serializableObjectKeyErrorHandler;
 
+    AutoCloseable mockCloseable;
+
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        mockCloseable = MockitoAnnotations.openMocks(this);
         List<String> notRetryableExceptions =
                 Arrays.asList("java.lang.IllegalArgumentException", "java.lang.NullPointerException");
         doNothing().when(mockDeadLetterProducer).send(any(), any());
@@ -66,6 +69,13 @@ class RetryableConsumerErrorHandlerTest {
                 new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
         serializableObjectKeyErrorHandler =
                 new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        if (mockCloseable != null) {
+            mockCloseable.close();
+        }
     }
 
     @Test

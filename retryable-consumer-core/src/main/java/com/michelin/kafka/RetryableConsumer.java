@@ -359,6 +359,7 @@ public class RetryableConsumer<K, V> implements Closeable {
 
     public void stop() {
         consumer.wakeup();
+        this.wakeUp = true;
     }
 
     public void addNonRetryableException(Class<? extends Exception>... exceptionTypes) {
@@ -372,7 +373,6 @@ public class RetryableConsumer<K, V> implements Closeable {
     @Override
     public void close() {
         log.info("Closing Consumer ...");
-        this.wakeUp = true;
         this.stop(); // this will exit the while true loop properly before consumer.close()
     }
 }

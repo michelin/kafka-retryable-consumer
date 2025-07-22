@@ -41,6 +41,8 @@ import org.mockito.MockitoAnnotations;
 @Slf4j
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class RetryableConsumerTest {
+    private RetryableConsumer<String, String> retryableConsumer; // The tested class
+
     @Mock
     private KafkaConsumer<String, String> kafkaConsumer;
 
@@ -49,9 +51,6 @@ class RetryableConsumerTest {
 
     @Mock
     private RetryableConsumerErrorHandler<String, String> errorHandler;
-
-    @Mock
-    private RetryableConsumer<String, String> retryableConsumer;
 
     @Mock
     private RetryableConsumerRebalanceListener rebalanceListener;
@@ -127,8 +126,7 @@ class RetryableConsumerTest {
 
     @Test
     @Order(1)
-    void listenAsync_shouldProcessRecords(TestInfo testInfo) throws Exception {
-        log.info("Launching test: {}", testInfo.getDisplayName());
+    void listenAsync_shouldProcessRecords() throws Exception {
         ConsumerRecord<String, String> consumerRecord =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
 
@@ -146,14 +144,11 @@ class RetryableConsumerTest {
         verify(recordProcessorNoError, timeout(5000).times(1)).processRecord(any());
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
-
-        log.info("Test {} complete!", testInfo.getDisplayName());
     }
 
     @Test
     @Order(2)
-    void listenAsync_shouldHandleNotRetryableError(TestInfo testInfo) throws Exception {
-        log.info("Launching test: {}", testInfo.getDisplayName());
+    void listenAsync_shouldHandleNotRetryableError() throws Exception {
         ConsumerRecord<String, String> record1 =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
 
@@ -188,14 +183,11 @@ class RetryableConsumerTest {
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset + 1);
-
-        log.info("Test {} complete!", testInfo.getDisplayName());
     }
 
     @Test
     @Order(3)
-    void listenAsync_shouldHandleInfiniteRetryableError(TestInfo testInfo) throws Exception {
-        log.info("Launching test: {}", testInfo.getDisplayName());
+    void listenAsync_shouldHandleInfiniteRetryableError() throws Exception {
         ConsumerRecord<String, String> record1 =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
 
@@ -235,14 +227,11 @@ class RetryableConsumerTest {
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset);
-
-        log.info("Test {} complete!", testInfo.getDisplayName());
     }
 
     @Test
     @Order(4)
-    void listenAsync_shouldHandleDeserializationException(TestInfo testInfo) throws Exception {
-        log.info("Launching test: {}", testInfo.getDisplayName());
+    void listenAsync_shouldHandleDeserializationException() throws Exception {
         ConsumerRecord<String, String> consumerRecord =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
 
@@ -283,8 +272,6 @@ class RetryableConsumerTest {
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
-
-        log.info("Test {} complete!", testInfo.getDisplayName());
     }
 
     static class CustomRetryableException extends Exception {}

@@ -23,11 +23,13 @@ import static org.mockito.Mockito.*;
 
 import com.michelin.kafka.avro.GenericErrorModel;
 import com.michelin.kafka.error.DeadLetterProducer;
+import java.io.Closeable;
 import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -40,11 +42,20 @@ class DeadLetterProducerTest {
 
     private DeadLetterProducer deadLetterProducer;
 
+    AutoCloseable mockCloseable = mock(Closeable.class);
+
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        mockCloseable = MockitoAnnotations.openMocks(this);
         String dlTopic = "dlTopic";
         deadLetterProducer = new DeadLetterProducer(mockKafkaProducer, dlTopic);
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        if (mockCloseable != null) {
+            mockCloseable.close();
+        }
     }
 
     @Test
