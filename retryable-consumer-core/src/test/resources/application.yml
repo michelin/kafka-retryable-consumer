@@ -4,6 +4,7 @@ kafka:
             not-retryable-exceptions:
                 - java.lang.NullPointerException
                 - java.lang.IllegalArgumentException
+            stop-on-error: true
             retry:
                 max: 10
                 backoff:

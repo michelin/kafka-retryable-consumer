@@ -283,7 +283,7 @@ public class RetryableConsumer<K, V> implements Closeable {
         } finally {
             // If the consumer has been paused for any error management during event processing
             // resume it before starting the next poll loop
-            if (isConsumerPaused()) {
+            if (isConsumerPaused() && !wakeUp) {
                 log.debug("Consumer was paused, resuming topic-partitions {}", consumer.assignment());
                 consumer.resume(consumer.assignment());
             }
@@ -294,7 +294,7 @@ public class RetryableConsumer<K, V> implements Closeable {
         log.debug("Exception occurred, running error handler processing ...", e);
         consumer.pause(consumer.assignment());
         if (this.currentProcessingRecord == null) {
-            // We just received a poison pills, let's skip it
+            // We just received a poison pill, let's skip it
             log.error("null record received", e);
         } else {
             RetryableConsumerConfiguration consumerConfig = this.kafkaRetryableConfiguration.getConsumer();
@@ -314,22 +314,29 @@ public class RetryableConsumer<K, V> implements Closeable {
                 if (!consumerConfig.getRetryMax().equals(0L)) {
                     this.retryCounter++;
                 }
-            } else { // not retryable : let's skip this record
-                // FEATURE log&fail to be implemented here (right now only log&continue-skip- exists)
-
-                // switch to next offset, so we do not loop on an unreadable record
-                skipCurrentOffset(
-                        new TopicPartition(
-                                this.currentProcessingRecord.topic(), this.currentProcessingRecord.partition()),
-                        this.currentProcessingRecord.offset());
-
+            } else { // non-recoverable error
                 // Send message to DeadLetter Topic
                 errorHandler.handleError(e, this.currentProcessingRecord);
-                this.doCommitSync();
-                log.debug("Committing offsets {} because of not retryable exception", offsets);
-                if (this.retryCounter > 0) {
-                    // if we were in retry mode, and now it is in error, it means we reached the max retry
-                    this.retryCounter = 0;
+
+                // If config is Log&Fail
+                if (consumerConfig.getStopOnError()) {
+                    log.error(
+                            "Non-recoverable error occurred (Not retryable, or retry limit reached). Stopping consumer after 'stop-on-error' configuration...",
+                            e);
+                    this.stop();
+                } else { // if config is Log&Continue (stopOnError = false)
+                    // switch to next offset, so we do not loop on an unreadable record
+                    skipCurrentOffset(
+                            new TopicPartition(
+                                    this.currentProcessingRecord.topic(), this.currentProcessingRecord.partition()),
+                            this.currentProcessingRecord.offset());
+                    this.doCommitSync();
+                    log.debug("Committing offsets {} because of not retryable exception", offsets);
+
+                    if (this.retryCounter > 0) {
+                        // if we were in retry mode, and now it is in error, it means we reached the max retry
+                        this.retryCounter = 0;
+                    }
                 }
             }
             log.debug("Processing of record with key {} completed with error", this.currentProcessingRecord.key());
@@ -374,5 +381,9 @@ public class RetryableConsumer<K, V> implements Closeable {
     public void close() {
         log.info("Closing Consumer ...");
         this.stop(); // this will exit the while true loop properly before consumer.close()
+    }
+
+    public boolean isStopped() {
+        return this.wakeUp;
     }
 }
