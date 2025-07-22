@@ -7,7 +7,6 @@
 [![GitHub Build](https://img.shields.io/github/actions/workflow/status/michelin/kafka-retryable-consumer/build.yml?branch=main&logo=github&style=for-the-badge)](https://img.shields.io/github/actions/workflow/status/michelin/kafka-retryable-consumer/build.yml)
 [![GitHub release](https://img.shields.io/github/v/release/michelin/kafka-retryable-consumer?logo=github&style=for-the-badge)](https://github.com/michelin/kafka-retryable-consumer/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/michelin/kafka-retryable-consumer?logo=github&style=for-the-badge)](https://github.com/michelin/kafka-retryable-consumer)
-[![Docker Pulls](https://img.shields.io/docker/pulls/michelin/kafka-retryable-consumer?label=Pulls&logo=docker&style=for-the-badge)](https://hub.docker.com/r/michelin/kafka-retryable-consumer/tags)
 [![SonarCloud Coverage](https://img.shields.io/sonar/coverage/michelin_kafka-retryable-consumer?logo=sonarcloud&server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge)](https://sonarcloud.io/component_measures?id=michelin_kafka-retryable-consumer&metric=coverage&view=list)
 [![SonarCloud Tests](https://img.shields.io/sonar/tests/michelin_kafka-retryable-consumer/main?server=https%3A%2F%2Fsonarcloud.io&style=for-the-badge&logo=sonarcloud)](https://sonarcloud.io/component_measures?metric=tests&view=list&id=michelin_kafka-retryable-consumer)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg?logo=apache&style=for-the-badge)](https://opensource.org/licenses/Apache-2.0)
