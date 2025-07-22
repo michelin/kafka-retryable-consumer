@@ -78,8 +78,9 @@ class RetryableConsumerTest {
 
     @BeforeEach
     void setUp(TestInfo testInfo) throws Exception {
-        log.info("Setting up RetryableConsumerTest for test : {}", testInfo.getDisplayName());
+        log.info("Setting up test : {}", testInfo.getDisplayName());
         closeableMocks = MockitoAnnotations.openMocks(this);
+        log.info("Mocks initialized!");
 
         when(errorHandler.isExceptionRetryable(CustomRetryableException.class)).thenReturn(true);
         when(errorHandler.isExceptionRetryable(CustomNotRetryableException.class))
@@ -106,14 +107,22 @@ class RetryableConsumerTest {
 
         retryableConsumer =
                 new RetryableConsumer<>(retryableConfiguration, kafkaConsumer, errorHandler, rebalanceListener);
+
+        log.info("Test setup completed for test {} !", testInfo.getDisplayName());
     }
 
     @AfterEach
     void teardown(TestInfo testInfo) throws Exception {
-        log.info("Tearing down RetryableConsumerTest for test : {}", testInfo.getDisplayName());
+        log.info("Tearing down test : {} ...", testInfo.getDisplayName());
         if (retryableConsumer != null) {
             retryableConsumer.close();
         }
+        if (closeableMocks != null) {
+            closeableMocks.close();
+            log.info("Mocks closed");
+        }
+
+        log.info("Test tear down completed for test {} !", testInfo.getDisplayName());
     }
 
     @Test
