@@ -25,6 +25,7 @@ import java.util.*;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,11 +40,20 @@ class RetryableConsumerRebalanceListenerTest {
     private Map<TopicPartition, OffsetAndMetadata> offsets;
     private RetryableConsumerRebalanceListener listener;
 
+    AutoCloseable mockCloseable;
+
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        mockCloseable = MockitoAnnotations.openMocks(this);
         offsets = new HashMap<>();
         listener = new RetryableConsumerRebalanceListener(consumer, offsets);
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        if (mockCloseable != null) {
+            mockCloseable.close();
+        }
     }
 
     @Test
