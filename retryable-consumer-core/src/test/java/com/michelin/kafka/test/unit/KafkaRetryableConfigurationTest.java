@@ -77,6 +77,7 @@ class KafkaRetryableConfigurationTest {
         assertTrue(
                 config.getConsumer().getTopics().contains("TOPIC"), "Consumer topics does not contains expected topic");
         assertEquals(2345L, config.getConsumer().getPollBackoffMs());
+        assertTrue(config.getConsumer().getStopOnError(), "stop-on-error should be true");
 
         Properties kafkaProps = config.getConsumer().getProperties();
         assertNotNull(kafkaProps, "kafka.properties not loaded");

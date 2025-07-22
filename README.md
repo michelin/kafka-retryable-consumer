@@ -82,6 +82,7 @@ kafka:
       not-retryable-exceptions: # List of exceptions that will be ignored by the retry mechanism
         - java.lang.NullPointerException
         - java.lang.IllegalArgumentException
+      stop-on-error: false # If true, the consumer will completely stop on not retryable error. Default value = false
       retry: # Retry configuration
         max: 10 # Maximum number of retry. 0 means infinite retry. Default value = 0
       poll:

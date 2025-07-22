@@ -44,6 +44,10 @@ public class RetryableConsumerConfiguration {
     @Builder.Default
     private Collection<String> topics = Collections.emptyList();
 
+    /** Stop consumer on error */
+    @Builder.Default
+    private Boolean stopOnError = false;
+
     /** Not retryable exceptions */
     @Builder.Default
     private Collection<String> notRetryableExceptions = Collections.emptyList();
@@ -83,6 +87,10 @@ public class RetryableConsumerConfiguration {
             if (k.startsWith("poll.backoff.ms")) {
                 String pollBackOff = String.valueOf(v);
                 this.setPollBackoffMs(Long.valueOf(pollBackOff));
+            }
+            if (k.startsWith("stop-on-error")) {
+                String stopOnError = String.valueOf(v);
+                this.setStopOnError(Boolean.parseBoolean(stopOnError));
             }
             if (k.startsWith("retry.max")) {
                 String retryMaxStr = String.valueOf(v);
