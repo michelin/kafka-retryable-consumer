@@ -371,7 +371,8 @@ public class RetryableConsumer<K, V> implements Closeable {
 
     @Override
     public void close() {
-        log.info("Closing Consumer");
+        log.info("Closing Consumer ...");
+        this.wakeUp = true;
         this.stop(); // this will exit the while true loop properly before consumer.close()
     }
 }
