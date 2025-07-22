@@ -127,8 +127,8 @@ class RetryableConsumerTest {
 
     @Test
     @Order(1)
-    void listenAsync_shouldProcessRecords() throws Exception {
-        log.info("Launching test: listenAsync_shouldProcessRecords");
+    void listenAsync_shouldProcessRecords(TestInfo testInfo) throws Exception {
+        log.info("Launching test: {}", testInfo.getDisplayName());
         ConsumerRecord<String, String> consumerRecord =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
 
@@ -146,11 +146,14 @@ class RetryableConsumerTest {
         verify(recordProcessorNoError, timeout(5000).times(1)).processRecord(any());
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
+
+        log.info("Test {} complete!", testInfo.getDisplayName());
     }
 
     @Test
     @Order(2)
-    void listenAsync_shouldHandleNotRetryableError() throws Exception {
+    void listenAsync_shouldHandleNotRetryableError(TestInfo testInfo) throws Exception {
+        log.info("Launching test: {}", testInfo.getDisplayName());
         ConsumerRecord<String, String> record1 =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
 
@@ -185,11 +188,14 @@ class RetryableConsumerTest {
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset + 1);
+
+        log.info("Test {} complete!", testInfo.getDisplayName());
     }
 
     @Test
     @Order(3)
-    void listenAsync_shouldHandleInfiniteRetryableError() throws Exception {
+    void listenAsync_shouldHandleInfiniteRetryableError(TestInfo testInfo) throws Exception {
+        log.info("Launching test: {}", testInfo.getDisplayName());
         ConsumerRecord<String, String> record1 =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
 
@@ -229,11 +235,14 @@ class RetryableConsumerTest {
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset);
+
+        log.info("Test {} complete!", testInfo.getDisplayName());
     }
 
     @Test
     @Order(4)
-    void listenAsync_shouldHandleDeserializationException() throws Exception {
+    void listenAsync_shouldHandleDeserializationException(TestInfo testInfo) throws Exception {
+        log.info("Launching test: {}", testInfo.getDisplayName());
         ConsumerRecord<String, String> consumerRecord =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
 
@@ -274,6 +283,8 @@ class RetryableConsumerTest {
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
         Assertions.assertEquals(
                 retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
+
+        log.info("Test {} complete!", testInfo.getDisplayName());
     }
 
     static class CustomRetryableException extends Exception {}
