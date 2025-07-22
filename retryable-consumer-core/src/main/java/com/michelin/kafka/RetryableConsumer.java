@@ -259,6 +259,7 @@ public class RetryableConsumer<K, V> implements Closeable {
 
     private void pollAndConsumeRecords(RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
         try {
+            log.info("Polling for records ...");
             ConsumerRecords<K, V> records = consumer.poll(Duration.ofMillis(
                     this.kafkaRetryableConfiguration.getConsumer().getPollBackoffMs()));
             log.debug("Pulled {} records", records.count());
