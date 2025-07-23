@@ -4,7 +4,7 @@
     <parent>
         <groupId>com.michelin.kafka</groupId>
         <artifactId>kafka-retryable-consumer</artifactId>
-        <version>1.0.1-SNAPSHOT</version>
+        <version>v1.0.1</version>
     </parent>
     <artifactId>retryable-consumer-core</artifactId>
 
