@@ -116,7 +116,7 @@ A Springboot starter should be build soon. Meanwhile, raw usage of Retryable Con
 
 Simply create a configuration that configuration class
 ```java
-package com.michelin.oscp.huw.configuration;
+package com.michelin.kafka.configuration;
 
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -153,7 +153,7 @@ kafka:
         specific.avro.reader: true #org.apache.avro.generic.GenericData$Record cannot be cast to HUWOutOrder # to solve this error. I added this config.
         max.poll.interval.ms: 30000 #5 min
         max.poll.records: 1
-        enable.auto.commit: false  # is this for both consumer and producer ?
+        enable.auto.commit: false #Important! to avoid auto commit when using retryable consumer
         fetch.min.bytes: 1
         heartbeat.interval.ms: 3000
         isolation.level: read_committed
