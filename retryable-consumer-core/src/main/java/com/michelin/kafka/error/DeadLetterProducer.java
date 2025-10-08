@@ -20,12 +20,13 @@ package com.michelin.kafka.error;
 
 import com.michelin.kafka.avro.GenericErrorModel;
 import com.michelin.kafka.configuration.DeadLetterProducerConfiguration;
-import java.util.Properties;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+
+import java.util.Properties;
 
 /** Dlq producer */
 @Slf4j

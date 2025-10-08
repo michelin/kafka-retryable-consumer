@@ -18,15 +18,16 @@
  */
 package com.michelin.kafka;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
+
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /** Retryable consumer rebalance listener used for managing offsets and partitions when kafka makes rebalancings */
 @Slf4j

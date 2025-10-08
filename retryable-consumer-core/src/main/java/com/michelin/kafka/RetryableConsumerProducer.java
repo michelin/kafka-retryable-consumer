@@ -21,40 +21,62 @@ package com.michelin.kafka;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
-import com.michelin.kafka.processors.RecordProcessor;
+import com.michelin.kafka.processors.RecordProcessorList;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+
+import java.util.LinkedList;
+import java.util.List;
 
 @Slf4j
-public class RetryableConsumer<K, V>
-        extends AbstractRetryableRecordProcessor<K, V, RecordProcessor<ConsumerRecord<K, V>, Exception>> {
+public class RetryableConsumerProducer<CK, CV, PK, PV>
+        extends AbstractRetryableRecordProcessor<
+                CK, CV, RecordProcessorList<ConsumerRecord<CK, CV>, Exception, PK, PV>> {
 
-    public RetryableConsumer(String name) throws KafkaConfigurationException {
+    private final Producer<PK, PV> producer;
+
+    public RetryableConsumerProducer(String name) throws KafkaConfigurationException {
         super(KafkaRetryableConfiguration.load());
         this.name = name;
+        this.producer = new KafkaProducer<>(
+                this.kafkaRetryableConfiguration.getProducer().getProperties());
     }
 
-    public RetryableConsumer(KafkaRetryableConfiguration config) {
+    public RetryableConsumerProducer(KafkaRetryableConfiguration config) {
         super(config);
+        this.producer = new KafkaProducer<>(config.getProducer().getProperties());
     }
 
-    public RetryableConsumer(
+    public RetryableConsumerProducer(
             KafkaRetryableConfiguration config,
-            KafkaConsumer<K, V> consumer,
-            RetryableConsumerErrorHandler<K, V> errorHandler,
+            KafkaConsumer<CK, CV> consumer,
+            KafkaProducer<PK, PV> producer,
+            RetryableConsumerErrorHandler<CK, CV> errorHandler,
             RetryableConsumerRebalanceListener rebalanceListener) {
         super(config, consumer, errorHandler, rebalanceListener);
+        this.producer = producer;
     }
 
     @Override
-    protected void processRecordsTemplate(ConsumerRecords<K, V> records) throws Exception {
-        for (ConsumerRecord<K, V> record : records) {
+    protected void processRecordsTemplate(ConsumerRecords<CK, CV> records) throws Exception {
+        List<ProducerRecord<PK, PV>> toSend = new LinkedList<>();
+
+        for (ConsumerRecord<CK, CV> record : records) {
             log.debug("Begin processing of record with key {} ...", record.key());
             this.currentProcessingRecord = record;
 
-            recordProcessor.processRecord(record);
+            List<ProducerRecord<PK, PV>> results = recordProcessor.processRecord(record);
+            for (ProducerRecord<PK, PV> result : results) {
+                ProducerRecord<PK, PV> copy = new ProducerRecord<>(
+                        result.topic(), null, result.timestamp(), result.key(), result.value(), result.headers());
+                toSend.add(copy);
+            }
+
             updateInternalOffsetsPosition(record);
 
             if (this.retryCounter > 0) {
@@ -64,6 +86,10 @@ public class RetryableConsumer<K, V>
 
             log.debug("Processing of record with key {} completed successfully", record.key());
             this.currentProcessingRecord = null;
+        }
+
+        for (ProducerRecord<PK, PV> rec : toSend) {
+            producer.send(rec);
         }
     }
 }

@@ -18,17 +18,15 @@
  */
 package com.michelin.kafka.test.unit;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-import com.michelin.kafka.configuration.DeadLetterProducerConfiguration;
-import com.michelin.kafka.configuration.KafkaConfigurationException;
-import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
-import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
-import java.util.Properties;
+import com.michelin.kafka.configuration.*;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import java.util.Properties;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 @Slf4j
 class KafkaRetryableConfigurationTest {
@@ -157,10 +155,10 @@ class KafkaRetryableConfigurationTest {
         String expectedName = "testName";
         RetryableConsumerConfiguration expectedConsumer = new RetryableConsumerConfiguration();
         DeadLetterProducerConfiguration expectedDeadLetter = new DeadLetterProducerConfiguration();
-
+        KafkaProducerConfiguration expectedProducer = new KafkaProducerConfiguration();
         // When
         KafkaRetryableConfiguration config =
-                new KafkaRetryableConfiguration(expectedName, expectedConsumer, expectedDeadLetter);
+                new KafkaRetryableConfiguration(expectedName, expectedConsumer, expectedDeadLetter, expectedProducer);
 
         // Then
         assertEquals(expectedName, config.getName());

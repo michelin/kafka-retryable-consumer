@@ -18,25 +18,29 @@
  */
 package com.michelin.kafka.test.unit;
 
-import static org.mockito.Mockito.*;
-
-import com.michelin.kafka.RecordProcessor;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.RetryableConsumerRebalanceListener;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
-import java.nio.ByteBuffer;
-import java.time.Instant;
-import java.util.Collections;
+import com.michelin.kafka.processors.RecordProcessor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.record.TimestampType;
 import org.junit.jupiter.api.*;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+
+import java.nio.ByteBuffer;
+import java.time.Instant;
+import java.util.Collections;
+
+import static org.mockito.Mockito.*;
 
 @Slf4j
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -169,7 +173,7 @@ class RetryableConsumerTest {
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
                         )); // all subsequent calls return empty record list
 
-        doThrow(new RetryableConsumerTest.CustomNotRetryableException())
+        doThrow(new CustomNotRetryableException())
                 .when(recordProcessorNoError)
                 .processRecord(record2);
 
@@ -208,7 +212,7 @@ class RetryableConsumerTest {
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next record
                         )); // all subsequent calls return empty record list
 
-        doThrow(new RetryableConsumerTest.CustomRetryableException())
+        doThrow(new CustomRetryableException())
                 .when(recordProcessorNoError)
                 .processRecord(record2);
 

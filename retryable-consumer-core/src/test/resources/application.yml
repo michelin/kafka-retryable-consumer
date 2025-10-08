@@ -30,3 +30,9 @@ kafka:
                         servers: fake.server:9092
                 topic: DL_TOPIC
         name: test-retry-consumer
+        producer:
+            properties:
+                application:
+                    id: dl-producer-test
+                bootstrap:
+                    servers: fake.server:9092

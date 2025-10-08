@@ -18,11 +18,12 @@
  */
 package com.michelin.kafka.test.unit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 import com.michelin.kafka.configuration.DeadLetterProducerConfiguration;
-import java.util.Properties;
 import org.junit.jupiter.api.Test;
+
+import java.util.Properties;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class DeadLetterProducerConfigurationTest {
 

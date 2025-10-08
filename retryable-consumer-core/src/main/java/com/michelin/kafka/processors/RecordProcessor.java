@@ -16,14 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.michelin.kafka;
+package com.michelin.kafka.processors;
 
-@FunctionalInterface
-public interface RecordProcessor<T, E extends Exception> {
-    /**
-     * Performs this operation on the given argument.
-     *
-     * @param t the input argument
-     */
-    void processRecord(T t) throws E;
-}
+/**
+ * A processor that handles records without producing output.
+ *
+ * @param <T> Input record type
+ * @param <E> Exception type
+ */
+public interface RecordProcessor<T, E extends Exception> extends RecordProcessorBase<T, Void, E> {}

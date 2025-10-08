@@ -34,7 +34,7 @@ import static com.michelin.kafka.configuration.KafkaRetryableConfiguration.PROPE
 @NoArgsConstructor
 @AllArgsConstructor
 @Slf4j
-public class DeadLetterProducerConfiguration {
+public class KafkaProducerConfiguration {
 
     /**
      * Contains the Kafka properties defined in the application.properties file. The properties are mapped according to
@@ -43,16 +43,10 @@ public class DeadLetterProducerConfiguration {
     @Builder.Default
     private Properties properties = new Properties();
 
-    /** Dead Letter Topic */
-    private String topic;
-
-    public void loadConfigMap(Map<String, String> deadLetterProducerConfigMap) {
-        deadLetterProducerConfigMap.forEach((k, v) -> {
+    public void loadConfigMap(Map<String, String> kafkaProducerConfigMap) {
+        kafkaProducerConfigMap.forEach((k, v) -> {
             if (k.startsWith("properties")) {
                 this.getProperties().put(StringUtils.substringAfter(k, PROPERTY_SEPARATOR), v);
-            }
-            if (k.startsWith("topic")) {
-                this.setTopic(v);
             }
         });
     }
@@ -66,18 +60,17 @@ public class DeadLetterProducerConfiguration {
             prefix = "";
         }
 
-        final HashMap<String, String> dlProducerConfigMap = new HashMap<>();
+        final HashMap<String, String> kafkaProducerConfigMap = new HashMap<>();
         retryablConsumerConfigProperties.forEach((k, v) -> {
-            if (StringUtils.startsWith((String) k, prefix + "dead-letter.producer.")) {
-                dlProducerConfigMap.put(
-                        StringUtils.substringAfter((String) k, prefix + "dead-letter.producer."), String.valueOf(v));
+            if (StringUtils.startsWith((String) k, prefix + "producer.")) {
+                kafkaProducerConfigMap.put(
+                        StringUtils.substringAfter((String) k, prefix + "producer."), String.valueOf(v));
             }
         });
 
-        if (dlProducerConfigMap.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "No '" + prefix + "dead-letter.producer' configuration found in configuration file");
+        if (kafkaProducerConfigMap.isEmpty()) {
+            throw new IllegalArgumentException("No '" + prefix + "producer' configuration found in configuration file");
         }
-        this.loadConfigMap(dlProducerConfigMap);
+        this.loadConfigMap(kafkaProducerConfigMap);
     }
 }

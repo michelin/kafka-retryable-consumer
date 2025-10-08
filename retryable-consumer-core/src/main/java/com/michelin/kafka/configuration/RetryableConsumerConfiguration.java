@@ -18,12 +18,13 @@
  */
 package com.michelin.kafka.configuration;
 
-import static com.michelin.kafka.configuration.KafkaRetryableConfiguration.PROPERTY_SEPARATOR;
-
-import java.util.*;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+
+import java.util.*;
+
+import static com.michelin.kafka.configuration.KafkaRetryableConfiguration.PROPERTY_SEPARATOR;
 
 @Builder
 @NoArgsConstructor
