@@ -19,9 +19,13 @@
 package com.michelin.kafka.processors;
 
 /**
- * A processor that handles records without producing output.
+ * Generic record processor abstraction.
  *
  * @param <T> Input record type
+ * @param <R> Result type (use {@link Void} for no output)
  * @param <E> Exception type
  */
-public interface RecordProcessor<T, E extends Exception> extends RecordProcessorBase<T, Void, E> {}
+@FunctionalInterface
+public interface RecordProcessor<T, R, E extends Exception> {
+    R processRecord(T t) throws E;
+}

@@ -18,7 +18,12 @@
  */
 package com.michelin.kafka.test.unit;
 
+import static org.mockito.Mockito.*;
+
 import com.michelin.kafka.RetryableConsumerRebalanceListener;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -28,12 +33,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.mockito.Mockito.*;
 
 class RetryableConsumerRebalanceListenerTest {
 

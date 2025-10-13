@@ -18,6 +18,8 @@
  */
 package com.michelin.kafka.test.integration;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.michelin.kafka.RetryableConsumerProducer;
 import com.michelin.kafka.avro.GenericErrorModel;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
@@ -25,6 +27,9 @@ import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
 import io.confluent.kafka.serializers.KafkaAvroDeserializer;
 import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
 import io.confluent.kafka.serializers.KafkaAvroSerializer;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -37,12 +42,6 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.integration.utils.EmbeddedKafkaCluster;
 import org.junit.jupiter.api.*;
-
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.ExecutionException;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @Slf4j
 @Timeout(15)
@@ -128,15 +127,12 @@ public class RetryableConsumerProducerIntegrationTest {
         retryableProducerKafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         retryableProducerKafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
-
         // Setup test Consumer configuration
         consumerConfig.putAll(clusterCommonConfig);
         consumerConfig.put(ConsumerConfig.GROUP_ID_CONFIG, "OutputCheckerConsumer");
         consumerConfig.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        consumerConfig.put(
-                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-        consumerConfig.put(
-                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        consumerConfig.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+        consumerConfig.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
 
         // Setup Dead Letter Producer configuration
         Properties dlProducerProps = kafkaRetryableConfiguration.getDeadLetter().getProperties();
@@ -159,8 +155,7 @@ public class RetryableConsumerProducerIntegrationTest {
         } else {
             this.dataTopic = "TOPIC-TEST";
             this.deadLetterTopic = "DEAD-LETTER-TEST";
-            this.dataOutputTopic = "OUTPUT-TOPIC-TEST" ;
-
+            this.dataOutputTopic = "OUTPUT-TOPIC-TEST";
         }
 
         KAFKA_CLUSTER.createTopic(dataTopic, 3, (short) 1);
@@ -203,7 +198,8 @@ public class RetryableConsumerProducerIntegrationTest {
                                 consumerRecord.partition());
                         consumedRecords.add(consumerRecord);
                         List<ProducerRecord<String, String>> results = new ArrayList<>();
-                        results.add(new ProducerRecord<>(dataOutputTopic, "k" + consumerRecord.key(), "value" + consumerRecord.value()));
+                        results.add(new ProducerRecord<>(
+                                dataOutputTopic, "k" + consumerRecord.key(), "value" + consumerRecord.value()));
                         return results;
                     });
 
@@ -259,7 +255,8 @@ public class RetryableConsumerProducerIntegrationTest {
                                 consumerRecord.partition());
                         consumedRecords.add(consumerRecord);
                         List<ProducerRecord<String, String>> results = new ArrayList<>();
-                        results.add(new ProducerRecord<>(dataOutputTopic, "k" + consumerRecord.key(), "value" + consumerRecord.value()));
+                        results.add(new ProducerRecord<>(
+                                dataOutputTopic, "k" + consumerRecord.key(), "value" + consumerRecord.value()));
                         return results;
                     });
 
@@ -314,8 +311,7 @@ public class RetryableConsumerProducerIntegrationTest {
         }
     }
 
-    private List<ConsumerRecord<String, String>> getOutputContent(
-            String topic, Duration consumerTimeout) {
+    private List<ConsumerRecord<String, String>> getOutputContent(String topic, Duration consumerTimeout) {
         List<ConsumerRecord<String, String>> recordsList = new ArrayList<>();
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerConfig)) {
             consumer.subscribe(Collections.singleton(topic));

@@ -18,8 +18,13 @@
  */
 package com.michelin.kafka.test.unit;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.michelin.kafka.avro.GenericErrorModel;
 import com.michelin.kafka.error.DeadLetterProducer;
+import java.io.Closeable;
+import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -29,12 +34,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
-import java.io.Closeable;
-import java.util.concurrent.CompletableFuture;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 class DeadLetterProducerTest {
 

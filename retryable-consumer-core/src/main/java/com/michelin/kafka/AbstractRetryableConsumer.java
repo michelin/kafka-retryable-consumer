@@ -22,6 +22,14 @@ import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
 import com.michelin.kafka.error.DeadLetterProducer;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
+import java.io.Closeable;
+import java.time.Duration;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
@@ -30,15 +38,8 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.errors.WakeupException;
 
-import java.io.Closeable;
-import java.time.Duration;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-
 @Slf4j
-public abstract class AbstractRetryableConsumer<K, V> implements Closeable {
+public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
 
     protected final Consumer<K, V> consumer;
     protected final KafkaRetryableConfiguration kafkaRetryableConfiguration;
@@ -47,6 +48,7 @@ public abstract class AbstractRetryableConsumer<K, V> implements Closeable {
     protected final RetryableConsumerErrorHandler<K, V> errorHandler;
 
     protected ConsumerRecord<K, V> currentProcessingRecord;
+    protected P recordProcessor;
 
     @Getter
     protected String name;
@@ -75,6 +77,32 @@ public abstract class AbstractRetryableConsumer<K, V> implements Closeable {
         this.rebalanceListener = rebalanceListener;
     }
 
+    @SuppressWarnings("unchecked")
+    protected void setCurrentProcessor(Object processor) {
+        this.recordProcessor = (P) processor;
+    }
+
+    public void listen(P processor) {
+        if (kafkaRetryableConfiguration.getConsumer().getTopics() == null
+                || kafkaRetryableConfiguration.getConsumer().getTopics().isEmpty()) {
+            throw new IllegalArgumentException("Topic list consumer configuration is not set");
+        }
+        listen(kafkaRetryableConfiguration.getConsumer().getTopics(), processor);
+    }
+
+    public void listen(Collection<String> topics, P processor) {
+        setCurrentProcessor(processor);
+        listenInternal(topics);
+    }
+
+    public Future<Void> listenAsync(P processor) {
+        return CompletableFuture.runAsync(() -> listen(processor));
+    }
+
+    public Future<Void> listenAsync(Collection<String> topics, P processor) {
+        return CompletableFuture.runAsync(() -> listen(topics, processor));
+    }
+
     protected void skipCurrentOffset(TopicPartition topicPartition, long currentOffset) {
         offsets.put(topicPartition, new OffsetAndMetadata(currentOffset + 1));
         consumer.seek(topicPartition, currentOffset + 1);
@@ -99,7 +127,7 @@ public abstract class AbstractRetryableConsumer<K, V> implements Closeable {
             throw e;
         } catch (CommitFailedException e) {
             log.warn(
-                    "Commit failed Normal : due to rebalance. If this persists there may be issues with configuration or infrastructure",
+                    "Commit failed normally due to rebalance. If this persists, there may be issues with configuration or infrastructure",
                     e);
         }
     }
@@ -110,11 +138,9 @@ public abstract class AbstractRetryableConsumer<K, V> implements Closeable {
                 if (offsets.get(tp) != null) {
                     consumer.seek(tp, offsets.get(tp));
                     consumer.commitSync();
-                    log.info("Seeked offset {}, for topic partition {}", offsets.get(tp), tp.toString());
+                    log.info("Seeked offset {}, for topic partition {}", offsets.get(tp), tp);
                 } else {
-                    log.warn(
-                            "Cannot rewind on {} to null offset, this could happen if the consumer group was just created",
-                            tp.toString());
+                    log.warn("Cannot rewind on {} to null offset (new consumer group?)", tp);
                 }
             } else {
                 String autoOffsetReset = (String) this.kafkaRetryableConfiguration
@@ -124,10 +150,10 @@ public abstract class AbstractRetryableConsumer<K, V> implements Closeable {
 
                 if (autoOffsetReset.equalsIgnoreCase(AutoOffsetResetStrategy.EARLIEST.name())) {
                     consumer.seekToBeginning(Collections.singleton(tp));
-                    log.info("Seeked beginning of consumer assignment {}", tp.toString());
+                    log.info("Seeked beginning of assignment {}", tp);
                 } else if (autoOffsetReset.equalsIgnoreCase(AutoOffsetResetStrategy.LATEST.name())) {
                     consumer.seekToEnd(Collections.singleton(tp));
-                    log.info("Seeked end of consumer assignment {}", tp.toString());
+                    log.info("Seeked end of assignment {}", tp);
                 }
             }
         });
@@ -140,73 +166,65 @@ public abstract class AbstractRetryableConsumer<K, V> implements Closeable {
                     this.kafkaRetryableConfiguration.getConsumer().getPollBackoffMs()));
             log.debug("Pulled {} records", records.count());
 
-            if (records.count() > 0) {
+            if (!records.isEmpty()) {
                 log.info("Processing {} records", records.count());
-                processRecordsTemplate(records);
+                processRecordsTemplate(records, recordProcessor);
                 this.doCommitSync();
             }
         } catch (WakeupException w) {
             this.wakeUp = true;
-            log.info("Wake up signal received. Getting out of the while loop", w);
+            log.info("Wake up signal received. Exiting poll loop", w);
             throw w;
         } catch (RecordDeserializationException e) {
-            log.error("It looks like we ate a poison pill, let's skip this record!", e);
+            log.error("Poison pill detected, skipping record!", e);
             skipCurrentOffset(e.topicPartition(), e.offset());
             errorHandler.handleConsumerDeserializationError(e);
         } catch (Exception e) {
             handleUnknownException(e);
         } finally {
             if (isConsumerPaused() && !wakeUp) {
-                log.debug("Consumer was paused, resuming topic-partitions {}", consumer.assignment());
+                log.debug("Consumer paused, resuming {}", consumer.assignment());
                 consumer.resume(consumer.assignment());
             }
         }
     }
 
     protected void handleUnknownException(Exception e) {
-        log.debug("Exception occurred, running error handler processing ...", e);
+        log.debug("Exception occurred, running error handler...", e);
         consumer.pause(consumer.assignment());
 
         if (this.currentProcessingRecord == null) {
-            log.error("null record received", e);
-        } else {
-            RetryableConsumerConfiguration consumerConfig = this.kafkaRetryableConfiguration.getConsumer();
-            boolean isCurrentErrorRetryable = this.retryCounter < consumerConfig.getRetryMax()
-                    || consumerConfig.getRetryMax().equals(0L);
-
-            if (errorHandler.isExceptionRetryable(e.getClass()) && isCurrentErrorRetryable) {
-                log.warn(e.getMessage(), e);
-                log.warn(
-                        "Retryable exception occurred, launching retry process ... (retry number={})",
-                        retryCounter + 1);
-                seekAndCommitToLatestSuccessfulOffset();
-
-                if (!consumerConfig.getRetryMax().equals(0L)) {
-                    this.retryCounter++;
-                }
-            } else {
-                errorHandler.handleError(e, this.currentProcessingRecord);
-
-                if (consumerConfig.getStopOnError()) {
-                    log.error(
-                            "Non-recoverable error occurred (Not retryable, or retry limit reached). Stopping consumer after 'stop-on-error' configuration...",
-                            e);
-                    this.stop();
-                } else {
-                    skipCurrentOffset(
-                            new TopicPartition(
-                                    this.currentProcessingRecord.topic(), this.currentProcessingRecord.partition()),
-                            this.currentProcessingRecord.offset());
-                    this.doCommitSync();
-                    log.debug("Committing offsets {} because of not retryable exception", offsets);
-
-                    if (this.retryCounter > 0) {
-                        this.retryCounter = 0;
-                    }
-                }
-            }
-            log.debug("Processing of record with key {} completed with error", this.currentProcessingRecord.key());
+            log.error("Null record received", e);
+            return;
         }
+
+        RetryableConsumerConfiguration consumerConfig = this.kafkaRetryableConfiguration.getConsumer();
+        boolean isCurrentErrorRetryable = this.retryCounter < consumerConfig.getRetryMax()
+                || consumerConfig.getRetryMax().equals(0L);
+
+        if (errorHandler.isExceptionRetryable(e.getClass()) && isCurrentErrorRetryable) {
+            log.warn(e.getMessage(), e);
+            log.warn("Retryable exception occurred, retry #{}", retryCounter + 1);
+            seekAndCommitToLatestSuccessfulOffset();
+            if (!consumerConfig.getRetryMax().equals(0L)) this.retryCounter++;
+        } else {
+            errorHandler.handleError(e, this.currentProcessingRecord);
+
+            if (consumerConfig.getStopOnError()) {
+                log.error("Non-recoverable error, stopping consumer after stop-on-error config...", e);
+                this.stop();
+            } else {
+                skipCurrentOffset(
+                        new TopicPartition(
+                                this.currentProcessingRecord.topic(), this.currentProcessingRecord.partition()),
+                        this.currentProcessingRecord.offset());
+                this.doCommitSync();
+                log.debug("Committed offsets {} after non-retryable exception", offsets);
+                this.retryCounter = 0;
+            }
+        }
+
+        log.debug("Processing of record with key {} completed with error", this.currentProcessingRecord.key());
     }
 
     protected void listenInternal(Collection<String> topics) {
@@ -218,17 +236,14 @@ public abstract class AbstractRetryableConsumer<K, V> implements Closeable {
                 this.pollAndConsumeRecordsInternal();
             }
         } catch (WakeupException e) {
-            log.info("Wake up signal received. Getting out of the while loop", e);
+            log.info("Wake up signal received, exiting loop", e);
         } finally {
             consumer.close();
-            log.info("Consumer is closed");
+            log.info("Consumer closed");
         }
     }
 
-    // Template method to be implemented by subclasses
-    protected abstract void processRecordsTemplate(ConsumerRecords<K, V> records) throws Exception;
-
-    protected abstract void setCurrentProcessor(Object processor);
+    protected abstract void processRecordsTemplate(ConsumerRecords<K, V> records, P processor) throws Exception;
 
     public void stop() {
         consumer.wakeup();

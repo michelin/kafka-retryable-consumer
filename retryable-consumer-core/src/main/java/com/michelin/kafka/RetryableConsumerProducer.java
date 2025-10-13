@@ -21,7 +21,9 @@ package com.michelin.kafka;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
-import com.michelin.kafka.processors.RecordProcessorList;
+import com.michelin.kafka.processors.RecordProcessor;
+import java.util.LinkedList;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -30,13 +32,10 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
-import java.util.LinkedList;
-import java.util.List;
-
 @Slf4j
 public class RetryableConsumerProducer<CK, CV, PK, PV>
-        extends AbstractRetryableRecordProcessor<
-                CK, CV, RecordProcessorList<ConsumerRecord<CK, CV>, Exception, PK, PV>> {
+        extends AbstractRetryableConsumer<
+                CK, CV, RecordProcessor<ConsumerRecord<CK, CV>, List<ProducerRecord<PK, PV>>, Exception>> {
 
     private final Producer<PK, PV> producer;
 
@@ -63,7 +62,11 @@ public class RetryableConsumerProducer<CK, CV, PK, PV>
     }
 
     @Override
-    protected void processRecordsTemplate(ConsumerRecords<CK, CV> records) throws Exception {
+    protected void processRecordsTemplate(
+            ConsumerRecords<CK, CV> records,
+            RecordProcessor<ConsumerRecord<CK, CV>, List<ProducerRecord<PK, PV>>, Exception> processor)
+            throws Exception {
+
         List<ProducerRecord<PK, PV>> toSend = new LinkedList<>();
 
         for (ConsumerRecord<CK, CV> record : records) {

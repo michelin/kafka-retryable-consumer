@@ -29,7 +29,7 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 @Slf4j
 public class RetryableConsumer<K, V>
-        extends AbstractRetryableRecordProcessor<K, V, RecordProcessor<ConsumerRecord<K, V>, Exception>> {
+        extends AbstractRetryableConsumer<K, V, RecordProcessor<ConsumerRecord<K, V>, Void, Exception>> {
 
     public RetryableConsumer(String name) throws KafkaConfigurationException {
         super(KafkaRetryableConfiguration.load());
@@ -49,7 +49,10 @@ public class RetryableConsumer<K, V>
     }
 
     @Override
-    protected void processRecordsTemplate(ConsumerRecords<K, V> records) throws Exception {
+    protected void processRecordsTemplate(
+            ConsumerRecords<K, V> records, RecordProcessor<ConsumerRecord<K, V>, Void, Exception> processor)
+            throws Exception {
+
         for (ConsumerRecord<K, V> record : records) {
             log.debug("Begin processing of record with key {} ...", record.key());
             this.currentProcessingRecord = record;

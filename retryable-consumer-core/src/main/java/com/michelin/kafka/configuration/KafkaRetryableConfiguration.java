@@ -18,6 +18,10 @@
  */
 package com.michelin.kafka.configuration;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.LinkedHashMap;
+import java.util.Properties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,11 +29,6 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.yaml.snakeyaml.Yaml;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.LinkedHashMap;
-import java.util.Properties;
 
 @Builder
 @AllArgsConstructor

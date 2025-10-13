@@ -19,14 +19,13 @@
 package com.michelin.kafka.error;
 
 import com.michelin.kafka.avro.GenericErrorModel;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.util.*;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.errors.RecordDeserializationException;
-
-import java.io.*;
-import java.nio.ByteBuffer;
-import java.util.*;
 
 @Slf4j
 @AllArgsConstructor
