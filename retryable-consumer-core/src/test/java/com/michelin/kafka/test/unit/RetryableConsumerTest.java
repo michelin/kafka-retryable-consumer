@@ -20,17 +20,20 @@ package com.michelin.kafka.test.unit;
 
 import static org.mockito.Mockito.*;
 
-import com.michelin.kafka.RecordProcessor;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.RetryableConsumerRebalanceListener;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
+import com.michelin.kafka.processors.RecordProcessor;
 import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Collections;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.record.TimestampType;
@@ -65,10 +68,10 @@ class RetryableConsumerTest {
     RetryableConsumerConfiguration consumerConfigurationStopOnError;
 
     @Mock
-    RecordProcessor<ConsumerRecord<String, String>, Exception> recordProcessorNoError;
+    RecordProcessor<ConsumerRecord<String, String>, Void, Exception> recordProcessorNoError;
 
     @Mock
-    RecordProcessor<ConsumerRecord<String, String>, Exception> recordProcessorDeserializationError;
+    RecordProcessor<ConsumerRecord<String, String>, Void, Exception> recordProcessorDeserializationError;
 
     private AutoCloseable closeableMocks;
 
@@ -99,8 +102,6 @@ class RetryableConsumerTest {
         when(retryableConfigurationStopOnError.getConsumer()).thenReturn(consumerConfigurationStopOnError);
         when(consumerConfigurationStopOnError.getTopics()).thenReturn(Collections.singletonList(topic));
         when(consumerConfigurationStopOnError.getStopOnError()).thenReturn(true);
-
-        doNothing().when(recordProcessorNoError).processRecord(any());
 
         retryableConsumer =
                 new RetryableConsumer<>(retryableConfiguration, kafkaConsumer, errorHandler, rebalanceListener);
@@ -169,9 +170,7 @@ class RetryableConsumerTest {
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
                         )); // all subsequent calls return empty record list
 
-        doThrow(new RetryableConsumerTest.CustomNotRetryableException())
-                .when(recordProcessorNoError)
-                .processRecord(record2);
+        doThrow(new CustomNotRetryableException()).when(recordProcessorNoError).processRecord(record2);
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
         verify(kafkaConsumer, timeout(5000).atLeastOnce()).poll(any());
@@ -208,9 +207,7 @@ class RetryableConsumerTest {
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next record
                         )); // all subsequent calls return empty record list
 
-        doThrow(new RetryableConsumerTest.CustomRetryableException())
-                .when(recordProcessorNoError)
-                .processRecord(record2);
+        doThrow(new CustomRetryableException()).when(recordProcessorNoError).processRecord(record2);
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
 

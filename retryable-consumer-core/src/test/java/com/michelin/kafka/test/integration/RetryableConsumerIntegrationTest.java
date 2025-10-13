@@ -33,8 +33,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.consumer.*;
-import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.integration.utils.EmbeddedKafkaCluster;
@@ -169,6 +174,7 @@ public class RetryableConsumerIntegrationTest {
                                 consumerRecord.key(),
                                 consumerRecord.partition());
                         consumedRecords.add(consumerRecord);
+                        return null;
                     });
 
             // THEN
@@ -218,6 +224,7 @@ public class RetryableConsumerIntegrationTest {
                                 consumerRecord.key(),
                                 consumerRecord.partition());
                         consumedRecords.add(consumerRecord);
+                        return null;
                     });
 
             // THEN
@@ -271,6 +278,7 @@ public class RetryableConsumerIntegrationTest {
                             // Run the normal business process
                             consumedRecords.add(consumerRecord);
                         }
+                        return null;
                     });
 
             // THEN
@@ -334,6 +342,7 @@ public class RetryableConsumerIntegrationTest {
                     // Run the normal (successful) business process
                     consumedRecords.add(consumerRecord);
                 }
+                return null;
             });
 
             // THEN
@@ -433,6 +442,7 @@ public class RetryableConsumerIntegrationTest {
                     consumedRecords.add(consumerRecord);
                     log.info("[TEST] record {} added to list", consumerRecord.key());
                 }
+                return null;
             });
 
             // THEN
@@ -504,6 +514,7 @@ public class RetryableConsumerIntegrationTest {
                     consumedRecords.add(consumerRecord);
                     log.info("[TEST] record {} added to consumed record list", consumerRecord.key());
                 }
+                return null;
             });
 
             // THEN

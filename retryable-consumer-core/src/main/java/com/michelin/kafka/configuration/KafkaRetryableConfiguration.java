@@ -20,7 +20,8 @@ package com.michelin.kafka.configuration;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Properties;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -47,12 +48,14 @@ public class KafkaRetryableConfiguration {
     protected String name;
     protected RetryableConsumerConfiguration consumer;
     protected DeadLetterProducerConfiguration deadLetter;
+    protected KafkaProducerConfiguration producer;
 
     private static final ClassLoader classLoader = KafkaRetryableConfiguration.class.getClassLoader();
 
     public KafkaRetryableConfiguration() {
         this.consumer = new RetryableConsumerConfiguration();
         this.deadLetter = new DeadLetterProducerConfiguration();
+        this.producer = new KafkaProducerConfiguration();
     }
 
     public static KafkaRetryableConfiguration load(String filePath) throws KafkaConfigurationException {
@@ -139,7 +142,7 @@ public class KafkaRetryableConfiguration {
         KafkaRetryableConfiguration kafkaRetryableConfiguration = new KafkaRetryableConfiguration();
         kafkaRetryableConfiguration.getConsumer().loadConfigProperties(CONFIGURATION_PREFIX, properties);
         kafkaRetryableConfiguration.getDeadLetter().loadConfigProperties(CONFIGURATION_PREFIX, properties);
-
+        kafkaRetryableConfiguration.getProducer().loadConfigProperties(CONFIGURATION_PREFIX, properties);
         return kafkaRetryableConfiguration;
     }
 

@@ -16,14 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.michelin.kafka;
+package com.michelin.kafka.processors;
 
+/**
+ * Generic record processor abstraction.
+ *
+ * @param <T> Input record type
+ * @param <R> Result type (use {@link Void} for no output)
+ * @param <E> Exception type
+ */
 @FunctionalInterface
-public interface RecordProcessor<T, E extends Exception> {
-    /**
-     * Performs this operation on the given argument.
-     *
-     * @param t the input argument
-     */
-    void processRecord(T t) throws E;
+public interface RecordProcessor<T, R, E extends Exception> {
+    R processRecord(T t) throws E;
 }

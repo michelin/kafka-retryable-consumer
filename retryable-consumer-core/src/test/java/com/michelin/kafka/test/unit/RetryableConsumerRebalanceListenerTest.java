@@ -21,7 +21,9 @@ package com.michelin.kafka.test.unit;
 import static org.mockito.Mockito.*;
 
 import com.michelin.kafka.RetryableConsumerRebalanceListener;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
