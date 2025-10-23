@@ -264,7 +264,7 @@ class RetryableConsumerTest {
         verify(kafkaConsumer, timeout(5000).atLeast(2)).poll(any());
 
         // Check the record is sent to DLQ
-        verify(errorHandler, timeout(5000).times(1)).handleConsumerDeserializationError(any());
+        verify(errorHandler, timeout(5000).times(1)).handleError(any(), any());
 
         // Check we have correctly skipped the record
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
