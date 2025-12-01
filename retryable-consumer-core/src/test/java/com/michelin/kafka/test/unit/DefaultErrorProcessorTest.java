@@ -19,6 +19,7 @@
 package com.michelin.kafka.test.unit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -31,6 +32,10 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.nio.ByteBuffer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.RecordDeserializationException;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.record.TimestampType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -141,5 +146,32 @@ public class DefaultErrorProcessorTest {
         assertEquals(record.offset(), capturedErrorModel.getOffset());
         assertEquals(record.key(), capturedErrorModel.getKey());
         assertEquals(record.value(), capturedErrorModel.getValue());
+    }
+
+    @Test
+    void shouldHandleErrorWithRecordDeserializationException() throws IOException {
+        // Given
+        ConsumerRecord<String, String> record = new ConsumerRecord<>("testTopic", 12, 13458L, "key", "value");
+        RecordDeserializationException rde =
+                new RecordDeserializationException(
+                        RecordDeserializationException.DeserializationExceptionOrigin.KEY,
+                        new TopicPartition(record.topic(),record.partition()),
+                        record.offset(),
+                        1764603801,
+                        TimestampType.CREATE_TIME,
+                        DefaultErrorProcessor.toByteBuffer("MyKey"),
+                        DefaultErrorProcessor.toByteBuffer("MyValue"),
+                        null,
+                        "Record deserialization error",
+                        null);
+
+        // When
+        errorProcessor.processError(rde, record, 32L);
+        verify(mockDeadLetterProducer, times(1)).send(keyCaptor.capture(), valueCaptor.capture());
+
+        GenericErrorModel capturedErrorModel = valueCaptor.getValue();
+
+        assertEquals("Record deserialization error", capturedErrorModel.getCause());
+        assertEquals(record.topic(), capturedErrorModel.getTopic());
     }
 }

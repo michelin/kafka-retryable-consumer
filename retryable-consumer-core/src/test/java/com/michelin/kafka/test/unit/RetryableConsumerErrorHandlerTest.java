@@ -160,7 +160,7 @@ class RetryableConsumerErrorHandlerTest {
         ConsumerRecord<String, String> record = new ConsumerRecord<>(topic, partition, offset, key, value);
 
         // When
-        errorHandlerWithCustomErrorProcessor.handleError(exception, record);
+        errorHandlerWithCustomErrorProcessor.handleError(exception, record, 2L);
 
         // Then
         verify(mockDeadLetterProducer, times(0)).send(any(), any()); // Verify the default error processor is not used
@@ -173,6 +173,7 @@ class RetryableConsumerErrorHandlerTest {
         assertEquals(record.topic(), recordCaptor.getValue().topic());
         assertEquals(record.offset(), recordCaptor.getValue().offset());
         assertEquals(record.partition(), recordCaptor.getValue().partition());
+        assertEquals(2L, retryCountCaptor.getValue());
     }
 
     public static class SerializableObject implements Serializable {
