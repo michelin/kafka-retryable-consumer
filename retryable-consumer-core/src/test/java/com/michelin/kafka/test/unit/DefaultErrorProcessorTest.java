@@ -19,7 +19,6 @@
 package com.michelin.kafka.test.unit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -34,7 +33,6 @@ import java.nio.ByteBuffer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
-import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.record.TimestampType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -152,18 +150,17 @@ public class DefaultErrorProcessorTest {
     void shouldHandleErrorWithRecordDeserializationException() throws IOException {
         // Given
         ConsumerRecord<String, String> record = new ConsumerRecord<>("testTopic", 12, 13458L, "key", "value");
-        RecordDeserializationException rde =
-                new RecordDeserializationException(
-                        RecordDeserializationException.DeserializationExceptionOrigin.KEY,
-                        new TopicPartition(record.topic(),record.partition()),
-                        record.offset(),
-                        1764603801,
-                        TimestampType.CREATE_TIME,
-                        DefaultErrorProcessor.toByteBuffer("MyKey"),
-                        DefaultErrorProcessor.toByteBuffer("MyValue"),
-                        null,
-                        "Record deserialization error",
-                        null);
+        RecordDeserializationException rde = new RecordDeserializationException(
+                RecordDeserializationException.DeserializationExceptionOrigin.KEY,
+                new TopicPartition(record.topic(), record.partition()),
+                record.offset(),
+                1764603801,
+                TimestampType.CREATE_TIME,
+                DefaultErrorProcessor.toByteBuffer("MyKey"),
+                DefaultErrorProcessor.toByteBuffer("MyValue"),
+                null,
+                "Record deserialization error",
+                null);
 
         // When
         errorProcessor.processError(rde, record, 32L);
