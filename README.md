@@ -209,8 +209,8 @@ the synchronous KafkaRetryableConsumer method ```listen(topics)```. (or use the 
 ```
 
 # Custom error processing
-If you need to implement custom error processing (ex: log additional metrics, send alert, specific Dead Letter Queue format ...etc.),
-you can implement a custom process through `ErrorProcessor` interface :
+If you need to build custom error processing (ex: log additional metrics, send alert, use a specific Dead Letter Queue format ...etc.),
+you can implement `ErrorProcessor` interface :
 
 ```java
     @Slf4j
