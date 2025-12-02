@@ -112,6 +112,42 @@ public class RetryableConsumer<K, V> implements Closeable {
      *
      * @param kafkaRetryableConfiguration kafka properties to set
      * @param consumer kafka consumer to set
+     * @param errorProcessor custom error processor to set
+     * @param rebalanceListener rebalance listener to set
+     */
+    public RetryableConsumer(
+            KafkaRetryableConfiguration kafkaRetryableConfiguration,
+            KafkaConsumer<K, V> consumer,
+            ErrorProcessor<ConsumerRecord<K, V>> errorProcessor,
+            RetryableConsumerRebalanceListener rebalanceListener) {
+        this.kafkaRetryableConfiguration = kafkaRetryableConfiguration;
+        this.consumer = consumer;
+        this.errorHandler = new RetryableConsumerErrorHandler<>(this.kafkaRetryableConfiguration, errorProcessor);
+        this.rebalanceListener = rebalanceListener;
+    }
+
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     * @param consumer kafka consumer to set
+     * @param errorProcessor custom error processor to set
+     */
+    public RetryableConsumer(
+            KafkaRetryableConfiguration kafkaRetryableConfiguration,
+            KafkaConsumer<K, V> consumer,
+            ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
+        this.kafkaRetryableConfiguration = kafkaRetryableConfiguration;
+        this.consumer = consumer;
+        this.errorHandler = new RetryableConsumerErrorHandler<>(this.kafkaRetryableConfiguration, errorProcessor);
+        this.rebalanceListener = new RetryableConsumerRebalanceListener(consumer, offsets);
+    }
+
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     * @param consumer kafka consumer to set
      * @param errorHandler error handler to set
      * @param rebalanceListener rebalance listener to set
      */

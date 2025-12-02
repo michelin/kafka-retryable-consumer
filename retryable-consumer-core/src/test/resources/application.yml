@@ -20,6 +20,8 @@ kafka:
                 specific:
                     avro:
                         reader: true
+                key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+                value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
             topics: TOPIC
         dead-letter:
             producer:
