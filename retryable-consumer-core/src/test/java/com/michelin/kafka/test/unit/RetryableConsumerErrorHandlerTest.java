@@ -22,17 +22,18 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import com.michelin.kafka.ErrorProcessor;
 import com.michelin.kafka.avro.GenericErrorModel;
+import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
+import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
 import com.michelin.kafka.error.DeadLetterProducer;
+import com.michelin.kafka.error.DefaultErrorProcessor;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.errors.RecordDeserializationException;
-import org.apache.kafka.common.record.TimestampType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,13 +49,32 @@ class RetryableConsumerErrorHandlerTest {
 
     @Captor
     private ArgumentCaptor<GenericErrorModel> valueCaptor;
+
+    @Captor
+    private ArgumentCaptor<Throwable> throwableCaptor;
+
+    @Captor
+    private ArgumentCaptor<ConsumerRecord<String, String>> recordCaptor;
+
+    @Captor
+    private ArgumentCaptor<Long> retryCountCaptor;
+
     /** Shared test Dead Letter Topic consumer configuration */
     @Mock
     private static DeadLetterProducer mockDeadLetterProducer;
 
+    @Mock
+    private KafkaRetryableConfiguration retryableConfiguration;
+
+    @Mock
+    private RetryableConsumerConfiguration consumerConfiguration;
+
     private RetryableConsumerErrorHandler<String, String> errorHandler;
     private RetryableConsumerErrorHandler<String, SerializableObject> serializableObjectErrorHandler;
     private RetryableConsumerErrorHandler<SerializableObject, String> serializableObjectKeyErrorHandler;
+
+    @Mock
+    ErrorProcessor<ConsumerRecord<String, String>> customErrorProcessor;
 
     AutoCloseable mockCloseable;
 
@@ -63,12 +83,26 @@ class RetryableConsumerErrorHandlerTest {
         mockCloseable = MockitoAnnotations.openMocks(this);
         List<String> notRetryableExceptions =
                 Arrays.asList("java.lang.IllegalArgumentException", "java.lang.NullPointerException");
+        when(retryableConfiguration.getConsumer()).thenReturn(consumerConfiguration);
+        when(consumerConfiguration.getNotRetryableExceptions()).thenReturn(notRetryableExceptions);
+
+        keyCaptor = ArgumentCaptor.forClass(String.class);
+        valueCaptor = ArgumentCaptor.forClass(GenericErrorModel.class);
+
         doNothing().when(mockDeadLetterProducer).send(any(), any());
-        errorHandler = new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
+        ErrorProcessor<ConsumerRecord<String, String>> errorProcessor =
+                new DefaultErrorProcessor<>(mockDeadLetterProducer);
+        errorHandler = new RetryableConsumerErrorHandler<>(retryableConfiguration, errorProcessor);
+
+        ErrorProcessor<ConsumerRecord<String, SerializableObject>> serializableObjectErrorProcessor =
+                new DefaultErrorProcessor<>(mockDeadLetterProducer);
         serializableObjectErrorHandler =
-                new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
+                new RetryableConsumerErrorHandler<>(retryableConfiguration, serializableObjectErrorProcessor);
+
+        ErrorProcessor<ConsumerRecord<SerializableObject, String>> serializableObjectKeyErrorProcessor =
+                new DefaultErrorProcessor<>(mockDeadLetterProducer);
         serializableObjectKeyErrorHandler =
-                new RetryableConsumerErrorHandler<>(mockDeadLetterProducer, notRetryableExceptions);
+                new RetryableConsumerErrorHandler<>(retryableConfiguration, serializableObjectKeyErrorProcessor);
     }
 
     @AfterEach
@@ -110,92 +144,36 @@ class RetryableConsumerErrorHandlerTest {
     }
 
     @Test
-    void testHandleConsumerDeserializationErrorExecution() {
-        TopicPartition topicPartition = new TopicPartition("ExampleTopic", 1);
-        RecordDeserializationException exception = new RecordDeserializationException(
-                RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
-                topicPartition,
-                1L,
-                Instant.now().toEpochMilli(),
-                TimestampType.NO_TIMESTAMP_TYPE,
-                ByteBuffer.wrap("Test Key".getBytes()),
-                ByteBuffer.wrap("Test Value".getBytes()),
-                null,
-                "Test message",
-                null);
-        assertDoesNotThrow(() -> errorHandler.handleConsumerDeserializationError(exception));
-    }
-
-    @Test
-    void testHandleConsumerDeserializationWithErrorNullTopic() {
-        RecordDeserializationException exception = new RecordDeserializationException(
-                RecordDeserializationException.DeserializationExceptionOrigin.VALUE,
-                null,
-                1L,
-                Instant.now().toEpochMilli(),
-                TimestampType.NO_TIMESTAMP_TYPE,
-                ByteBuffer.wrap("Test Key".getBytes()),
-                ByteBuffer.wrap("Test Value".getBytes()),
-                null,
-                "Test message",
-                null);
-
-        assertThrows(NullPointerException.class, () -> errorHandler.handleConsumerDeserializationError(exception));
-    }
-
-    @Test
-    void shouldHandleErrorWhenAllParametersAreNotNull() {
+    void shouldHandleCustomErrorProcessor() {
         // Given
-        String cause = "cause";
-        String context = "context";
+        RetryableConsumerErrorHandler<String, String> errorHandlerWithCustomErrorProcessor =
+                new RetryableConsumerErrorHandler<>(retryableConfiguration, customErrorProcessor);
+
+        String cause = "Test exception message";
         Long offset = 1L;
         Integer partition = 1;
         String topic = "topic";
-        Throwable exception = new RuntimeException("Test exception");
+        Throwable exception = new RuntimeException(cause);
         String key = "key";
         String value = "value";
         doNothing().when(mockDeadLetterProducer).send(any(), any());
+        ConsumerRecord<String, String> record = new ConsumerRecord<>(topic, partition, offset, key, value);
 
         // When
-        errorHandler.handleError(cause, context, offset, partition, topic, exception, key, value);
+        errorHandlerWithCustomErrorProcessor.handleError(exception, record, 2L);
 
         // Then
-        verify(mockDeadLetterProducer, times(1)).send(keyCaptor.capture(), valueCaptor.capture());
+        verify(mockDeadLetterProducer, times(0)).send(any(), any()); // Verify the default error processor is not used
+        verify(customErrorProcessor, times(1)) // Verify the custom error processor is used
+                .processError(throwableCaptor.capture(), recordCaptor.capture(), retryCountCaptor.capture());
 
-        GenericErrorModel capturedErrorModel = valueCaptor.getValue();
-
-        assertEquals(cause, capturedErrorModel.getCause());
-        assertEquals(context, capturedErrorModel.getContextMessage());
-        assertEquals(offset, capturedErrorModel.getOffset());
-        assertEquals(partition, capturedErrorModel.getPartition());
-        assertEquals(topic, capturedErrorModel.getTopic());
-    }
-
-    @Test
-    void shouldHandleErrorWhenExceptionIsNull() {
-        // Given
-        String cause = "cause";
-        String context = "context";
-        Long offset = 1L;
-        Integer partition = 1;
-        String topic = "topic";
-        String key = "key";
-        String value = "value";
-
-        // When
-        errorHandler.handleError(cause, context, offset, partition, topic, null, key, value);
-
-        // Then
-        verify(mockDeadLetterProducer, times(1)).send(keyCaptor.capture(), valueCaptor.capture());
-
-        GenericErrorModel capturedErrorModel = valueCaptor.getValue();
-
-        assertEquals(cause, capturedErrorModel.getCause());
-        assertEquals(context, capturedErrorModel.getContextMessage());
-        assertEquals(offset, capturedErrorModel.getOffset());
-        assertEquals(partition, capturedErrorModel.getPartition());
-        assertEquals(topic, capturedErrorModel.getTopic());
-        assertNull(capturedErrorModel.getStack()); // Check that Stack is null when exception is null
+        assertEquals(exception.getMessage(), throwableCaptor.getValue().getMessage());
+        assertEquals(record.key(), recordCaptor.getValue().key());
+        assertEquals(record.value(), recordCaptor.getValue().value());
+        assertEquals(record.topic(), recordCaptor.getValue().topic());
+        assertEquals(record.offset(), recordCaptor.getValue().offset());
+        assertEquals(record.partition(), recordCaptor.getValue().partition());
+        assertEquals(2L, retryCountCaptor.getValue());
     }
 
     public static class SerializableObject implements Serializable {
@@ -206,18 +184,19 @@ class RetryableConsumerErrorHandlerTest {
     @Test
     void shouldHandleErrorWhenValueIsNotString() {
         // Given
-        String cause = "cause";
-        String context = "context";
+        String cause = "Test exception message";
         Long offset = 1L;
         Integer partition = 1;
         String topic = "topic";
-        Throwable exception = new RuntimeException("Test exception");
+        Throwable exception = new RuntimeException(cause);
         String key = "key";
         SerializableObject value = new SerializableObject();
         doNothing().when(mockDeadLetterProducer).send(any(), any());
 
+        ConsumerRecord<String, SerializableObject> record = new ConsumerRecord<>(topic, partition, offset, key, value);
+
         // When
-        serializableObjectErrorHandler.handleError(cause, context, offset, partition, topic, exception, key, value);
+        serializableObjectErrorHandler.handleError(exception, record);
 
         // Then
         verify(mockDeadLetterProducer, times(1)).send(keyCaptor.capture(), valueCaptor.capture());
@@ -225,7 +204,7 @@ class RetryableConsumerErrorHandlerTest {
         GenericErrorModel capturedErrorModel = valueCaptor.getValue();
 
         assertEquals(cause, capturedErrorModel.getCause());
-        assertEquals(context, capturedErrorModel.getContextMessage());
+        assertNotNull(capturedErrorModel.getContextMessage());
         assertEquals(offset, capturedErrorModel.getOffset());
         assertEquals(partition, capturedErrorModel.getPartition());
         assertEquals(topic, capturedErrorModel.getTopic());
@@ -235,18 +214,20 @@ class RetryableConsumerErrorHandlerTest {
     @Test
     void shouldHandleErrorWhenKeyIsNotString() {
         // Given
-        String cause = "cause";
-        String context = "context";
+        String cause = "Test exception message";
         Long offset = 1L;
         Integer partition = 1;
         String topic = "topic";
-        Throwable exception = new RuntimeException("Test exception");
+
+        Throwable exception = new RuntimeException(cause);
         SerializableObject key = new SerializableObject();
         String value = "value";
         doNothing().when(mockDeadLetterProducer).send(any(), any());
 
+        ConsumerRecord<SerializableObject, String> record = new ConsumerRecord<>(topic, partition, offset, key, value);
+
         // When
-        serializableObjectKeyErrorHandler.handleError(cause, context, offset, partition, topic, exception, key, value);
+        serializableObjectKeyErrorHandler.handleError(exception, record);
 
         // Then
         verify(mockDeadLetterProducer, times(1)).send(keyCaptor.capture(), valueCaptor.capture());
@@ -254,30 +235,11 @@ class RetryableConsumerErrorHandlerTest {
         GenericErrorModel capturedErrorModel = valueCaptor.getValue();
 
         assertEquals(cause, capturedErrorModel.getCause());
-        assertEquals(context, capturedErrorModel.getContextMessage());
+        assertNotNull(capturedErrorModel.getContextMessage());
         assertEquals(offset, capturedErrorModel.getOffset());
         assertEquals(partition, capturedErrorModel.getPartition());
         assertEquals(topic, capturedErrorModel.getTopic());
         assertNotNull(capturedErrorModel.getByteKey()); // Check that ByteKey is not null when key is not a String
-    }
-
-    @Test
-    void testToByteBuffer() throws IOException, ClassNotFoundException {
-        // Arrange
-        String testString = "Test string";
-
-        // Act
-        ByteBuffer buffer = RetryableConsumerErrorHandler.toByteBuffer(testString);
-
-        // Convert ByteBuffer back to String
-        byte[] bytes = new byte[buffer.remaining()];
-        buffer.get(bytes);
-        ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-        ObjectInputStream ois = new ObjectInputStream(bais);
-        String resultString = (String) ois.readObject();
-
-        // Assert
-        assertEquals(testString, resultString);
     }
 
     @Test

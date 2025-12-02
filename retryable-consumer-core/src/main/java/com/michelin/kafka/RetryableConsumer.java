@@ -21,7 +21,6 @@ package com.michelin.kafka;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
-import com.michelin.kafka.error.DeadLetterProducer;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import java.io.Closeable;
 import java.time.Duration;
@@ -73,6 +72,28 @@ public class RetryableConsumer<K, V> implements Closeable {
         this.name = name;
     }
 
+    /** Default constructor with no parameters */
+    public RetryableConsumer(String name, ErrorProcessor<ConsumerRecord<K, V>> errorProcessor)
+            throws KafkaConfigurationException {
+        this(KafkaRetryableConfiguration.load(), errorProcessor);
+        this.name = name;
+    }
+
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     */
+    public RetryableConsumer(
+            KafkaRetryableConfiguration kafkaRetryableConfiguration,
+            ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
+        this.kafkaRetryableConfiguration = kafkaRetryableConfiguration;
+        this.consumer = new KafkaConsumer<>(
+                this.kafkaRetryableConfiguration.getConsumer().getProperties());
+        this.rebalanceListener = new RetryableConsumerRebalanceListener(consumer, offsets);
+        this.errorHandler = new RetryableConsumerErrorHandler<>(this.kafkaRetryableConfiguration, errorProcessor);
+    }
+
     /**
      * Constructor with parameters
      *
@@ -82,9 +103,43 @@ public class RetryableConsumer<K, V> implements Closeable {
         this.kafkaRetryableConfiguration = kafkaRetryableConfiguration;
         this.consumer = new KafkaConsumer<>(
                 this.kafkaRetryableConfiguration.getConsumer().getProperties());
-        this.errorHandler = new RetryableConsumerErrorHandler<>(
-                new DeadLetterProducer(this.kafkaRetryableConfiguration.getDeadLetter()),
-                this.kafkaRetryableConfiguration.getConsumer().getNotRetryableExceptions());
+        this.errorHandler = new RetryableConsumerErrorHandler<>(this.kafkaRetryableConfiguration);
+        this.rebalanceListener = new RetryableConsumerRebalanceListener(consumer, offsets);
+    }
+
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     * @param consumer kafka consumer to set
+     * @param errorProcessor custom error processor to set
+     * @param rebalanceListener rebalance listener to set
+     */
+    public RetryableConsumer(
+            KafkaRetryableConfiguration kafkaRetryableConfiguration,
+            KafkaConsumer<K, V> consumer,
+            ErrorProcessor<ConsumerRecord<K, V>> errorProcessor,
+            RetryableConsumerRebalanceListener rebalanceListener) {
+        this.kafkaRetryableConfiguration = kafkaRetryableConfiguration;
+        this.consumer = consumer;
+        this.errorHandler = new RetryableConsumerErrorHandler<>(this.kafkaRetryableConfiguration, errorProcessor);
+        this.rebalanceListener = rebalanceListener;
+    }
+
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     * @param consumer kafka consumer to set
+     * @param errorProcessor custom error processor to set
+     */
+    public RetryableConsumer(
+            KafkaRetryableConfiguration kafkaRetryableConfiguration,
+            KafkaConsumer<K, V> consumer,
+            ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
+        this.kafkaRetryableConfiguration = kafkaRetryableConfiguration;
+        this.consumer = consumer;
+        this.errorHandler = new RetryableConsumerErrorHandler<>(this.kafkaRetryableConfiguration, errorProcessor);
         this.rebalanceListener = new RetryableConsumerRebalanceListener(consumer, offsets);
     }
 
@@ -201,6 +256,24 @@ public class RetryableConsumer<K, V> implements Closeable {
      * listenAsync
      *
      * @param recordProcessor processor function to process every received records
+     * @param errorProcessor processor function to be called whenever an unrecoverable error is detected
+     */
+    public void listen(
+            RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor,
+            ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
+        if (kafkaRetryableConfiguration.getConsumer().getTopics() == null
+                || kafkaRetryableConfiguration.getConsumer().getTopics().isEmpty()) {
+            throw new IllegalArgumentException("Topic list consumer configuration is not set");
+        }
+        this.listen(kafkaRetryableConfiguration.getConsumer().getTopics(), recordProcessor, errorProcessor);
+    }
+
+    /**
+     * This method will start a blocking Kafka the consumer that will run in background. The listened topics are the one
+     * * in the configuration file. Warning : this method is blocker. If you need an asynchronous consumer, use
+     * listenAsync
+     *
+     * @param recordProcessor processor function to process every received records
      */
     public void listen(RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
         if (kafkaRetryableConfiguration.getConsumer().getTopics() == null
@@ -218,6 +291,21 @@ public class RetryableConsumer<K, V> implements Closeable {
      * @param recordProcessor processor function to process every received records
      */
     public void listen(Collection<String> topics, RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
+        this.listen(topics, recordProcessor, null);
+    }
+
+    /**
+     * This method will start a blocking Kafka the consumer that will run in background. The listened topics are the one
+     * in topics parameter. (Topics list of the configuration file is ignored). Warning : this method is blocker. If you
+     * need an asynchronous consumer, use listenAsync
+     *
+     * @param recordProcessor processor function to process every received records
+     * @param errorProcessor processor function to be called whenever an unrecoverable error is detected
+     */
+    public void listen(
+            Collection<String> topics,
+            RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor,
+            ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
         log.info("Starting consumer for topics {}", topics);
         try {
             consumer.subscribe(topics, this.rebalanceListener);
@@ -231,6 +319,19 @@ public class RetryableConsumer<K, V> implements Closeable {
             consumer.close();
             log.info("Consumer is closed");
         }
+    }
+
+    /**
+     * This method will start an asynchronous Kafka the consumer that will run in background. The listened topics are
+     * the one in the configuration file.
+     *
+     * @param recordProcessor processor function to process every received records
+     * @return A CompletableFuture of the kafka consumer listener
+     */
+    public Future<Void> listenAsync(
+            RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor,
+            ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
+        return CompletableFuture.runAsync(() -> listen(recordProcessor, errorProcessor));
     }
 
     /**
@@ -254,7 +355,7 @@ public class RetryableConsumer<K, V> implements Closeable {
      */
     public Future<Void> listenAsync(
             Collection<String> topics, RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
-        return CompletableFuture.runAsync(() -> listen(topics, recordProcessor));
+        return CompletableFuture.runAsync(() -> listen(topics, recordProcessor, null));
     }
 
     private void pollAndConsumeRecords(RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor) {
@@ -277,7 +378,8 @@ public class RetryableConsumer<K, V> implements Closeable {
         } catch (RecordDeserializationException e) {
             log.error("It looks like we ate a poison pill, let's skip this record!", e);
             skipCurrentOffset(e.topicPartition(), e.offset());
-            errorHandler.handleConsumerDeserializationError(e);
+
+            errorHandler.handleError(e, null);
         } catch (Exception e) {
             handleUnknownException(e);
         } finally {
@@ -315,7 +417,8 @@ public class RetryableConsumer<K, V> implements Closeable {
                     this.retryCounter++;
                 }
             } else { // non-recoverable error
-                // Send message to DeadLetter Topic
+
+                // Default : Send message to DeadLetter Topic
                 errorHandler.handleError(e, this.currentProcessingRecord);
 
                 // If config is Log&Fail

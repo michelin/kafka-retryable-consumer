@@ -18,19 +18,27 @@
  */
 package com.michelin.kafka.test.unit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.*;
 
+import com.michelin.kafka.ErrorProcessor;
 import com.michelin.kafka.RecordProcessor;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.RetryableConsumerRebalanceListener;
+import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.record.TimestampType;
@@ -94,10 +102,14 @@ class RetryableConsumerTest {
         when(retryableConfiguration.getName()).thenReturn("Test Consumer");
         when(retryableConfiguration.getConsumer()).thenReturn(consumerConfiguration);
         when(consumerConfiguration.getTopics()).thenReturn(Collections.singletonList(topic));
+        when(consumerConfiguration.getNotRetryableExceptions())
+                .thenReturn(Collections.singletonList(CustomNotRetryableException.class.getName()));
 
         when(retryableConfigurationStopOnError.getName()).thenReturn("Test Consumer with stop on error config");
         when(retryableConfigurationStopOnError.getConsumer()).thenReturn(consumerConfigurationStopOnError);
         when(consumerConfigurationStopOnError.getTopics()).thenReturn(Collections.singletonList(topic));
+        when(consumerConfigurationStopOnError.getNotRetryableExceptions())
+                .thenReturn(Collections.singletonList(CustomNotRetryableException.class.getName()));
         when(consumerConfigurationStopOnError.getStopOnError()).thenReturn(true);
 
         doNothing().when(recordProcessorNoError).processRecord(any());
@@ -140,8 +152,7 @@ class RetryableConsumerTest {
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
         verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
         verify(recordProcessorNoError, timeout(5000).times(1)).processRecord(any());
-        Assertions.assertEquals(
-                retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
+        assertEquals(retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
     }
 
     @Test
@@ -179,8 +190,7 @@ class RetryableConsumerTest {
 
         // Not retryable error : Check we have correctly skipped the record
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
-        Assertions.assertEquals(
-                retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset + 1);
+        assertEquals(retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset + 1);
     }
 
     @Test
@@ -223,8 +233,7 @@ class RetryableConsumerTest {
 
         // Retryable error : Check we store correctly the offset of second record only
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
-        Assertions.assertEquals(
-                retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset);
+        assertEquals(retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset);
     }
 
     @Test
@@ -264,12 +273,11 @@ class RetryableConsumerTest {
         verify(kafkaConsumer, timeout(5000).atLeast(2)).poll(any());
 
         // Check the record is sent to DLQ
-        verify(errorHandler, timeout(5000).times(1)).handleConsumerDeserializationError(any());
+        verify(errorHandler, timeout(5000).times(1)).handleError(any(), any());
 
         // Check we have correctly skipped the record
         Assertions.assertNotNull(retryableConsumer.getCurrentOffset(record1TopicPartition));
-        Assertions.assertEquals(
-                retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
+        assertEquals(retryableConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
     }
 
     @Test
@@ -304,7 +312,104 @@ class RetryableConsumerTest {
         Assertions.assertTrue(retryableConsumerStopOnError.isStopped());
     }
 
+    @Test
+    @Order(6)
+    void testRetryableWithCustomErrorProcessor() throws Exception {
+        CustomErrorProcessor customErrorProcessor = new CustomErrorProcessor();
+        ConsumerRecord<String, String> record1 =
+                new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
+        ConsumerRecord<String, String> record2 =
+                new ConsumerRecord<>(topic, record2Partition, record2Offset, "key2", "value2");
+
+        try (RetryableConsumer<String, String> retryableConsumerCustomError =
+                new RetryableConsumer<>(retryableConfigurationStopOnError, kafkaConsumer, customErrorProcessor)) {
+            when(kafkaConsumer.poll(any()))
+                    .thenReturn( // First poll return one record
+                            new ConsumerRecords<>(
+                                    Collections.singletonMap(record1TopicPartition, Collections.singletonList(record1)),
+                                    Collections.singletonMap(
+                                            record1TopicPartition, new OffsetAndMetadata(1L)) // next records
+                                    ))
+                    .thenReturn(new ConsumerRecords<>(
+                            Collections.singletonMap(record2TopicPartition, Collections.singletonList(record2)),
+                            Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
+                            ))
+                    .thenReturn(new ConsumerRecords<>(
+                            Collections.emptyMap(),
+                            Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
+                            )); // all subsequent calls return empty record list
+
+            doThrow(new RetryableConsumerTest.CustomNotRetryableException("Test Custom Error Processor"))
+                    .when(recordProcessorNoError)
+                    .processRecord(record2);
+
+            retryableConsumerCustomError.listenAsync(r -> recordProcessorNoError.processRecord(r));
+            verify(kafkaConsumer, timeout(5000).atLeastOnce()).poll(any());
+
+            assertEquals(1, customErrorProcessor.getErrors().size());
+            assertEquals(
+                    "Test Custom Error Processor",
+                    customErrorProcessor.getErrors().get(0));
+        }
+    }
+
+    @Test
+    @Order(7)
+    void testRetryableConstructors() throws KafkaConfigurationException {
+        CustomErrorProcessor customErrorProcessor = new CustomErrorProcessor();
+
+        try (RetryableConsumer<String, String> retryableConsumer1 = new RetryableConsumer<>("test")) {
+            assertNotNull(retryableConsumer1);
+        } catch (Exception e) {
+            assertEquals(KafkaException.class, e.getClass());
+        }
+
+        KafkaRetryableConfiguration config = KafkaRetryableConfiguration.load();
+        try (RetryableConsumer<String, String> retryableConsumer2 =
+                new RetryableConsumer<>(config, customErrorProcessor)) {
+            assertNotNull(retryableConsumer2);
+        } catch (Exception e) {
+            assertEquals(KafkaException.class, e.getClass());
+        }
+
+        try (RetryableConsumer<String, String> retryableConsumerCustomError =
+                new RetryableConsumer<>(retryableConfigurationStopOnError, kafkaConsumer, customErrorProcessor)) {
+            assertNotNull(retryableConsumerCustomError);
+        }
+
+        try (RetryableConsumer<String, String> retryableConsumerCustomError = new RetryableConsumer<>(
+                retryableConfigurationStopOnError, kafkaConsumer, customErrorProcessor, rebalanceListener)) {
+            assertNotNull(retryableConsumerCustomError);
+        }
+    }
+
+    @Getter
+    static class CustomErrorProcessor implements ErrorProcessor<ConsumerRecord<String, String>> {
+        List<String> errors = new ArrayList<>();
+
+        @Override
+        public void processError(Throwable throwable, ConsumerRecord<String, String> record, Long retryCount) {
+            // Custom error processing logic
+            log.error(
+                    "Error processing record with key {} and value {}. Retry count: {}. Error: {}",
+                    record.key(),
+                    record.value(),
+                    retryCount,
+                    throwable.getMessage());
+
+            errors.add(throwable.getMessage());
+        }
+    }
+
     static class CustomRetryableException extends Exception {}
 
-    static class CustomNotRetryableException extends Exception {}
+    static class CustomNotRetryableException extends Exception {
+        public CustomNotRetryableException() {
+            super();
+        }
+
+        public CustomNotRetryableException(String message) {
+            super(message);
+        }
+    }
 }

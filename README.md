@@ -25,13 +25,15 @@ This lib is proposed to ease the usage of kafka for simple data consumer with ex
 * [Getting Started](#getting-started)
   * [Vanilla Java](#vanilla-java)
   * [Springboot](#springboot)
-  * [Code References](#code-references)
+* [Custom Error Processing](#custom-error-processing)
+* [Code References](#code-references)
 
 ## Features
 ### Current version
 - Error management with Dead Letter Queue
 - Automatic record commit management in case of error or partition rebalance
 - Retry on error with Exception exclusion management
+- Custom Error processing
 
 ### To be implemented
 - Implement core lib Log&Fail feature
@@ -205,7 +207,36 @@ the synchronous KafkaRetryableConsumer method ```listen(topics)```. (or use the 
         }
     }
 ```
-## Code References
+
+# Custom error processing
+If you need to implement custom error processing (ex: log additional metrics, send alert, specific Dead Letter Queue format ...etc.),
+you can implement a custom process through `ErrorProcessor` interface :
+
+```java
+    @Slf4j
+    public class CustomErrorProcessor implements ErrorProcessor<ConsumerRecord<String, MyAvroObject>> {
+        @Override
+        public void processError(Throwable throwable, ConsumerRecord<String, MyAvroObject> record, Exception exception, int retryAttemptCount) {
+            // Your custom error processing here
+            log.error("...");
+        }
+    }
+```
+
+Then inject this custom error processor in your RetryableConsumer constructor :
+```java
+    try(RetryableConsumer<String, MyAvroObject> retryableConsumer = new RetryableConsumer<>(
+            retryableConsumerConfiguration,
+            new CustomErrorProcessor()
+    )) {
+        retryableConsumer.listen(
+                Collections.singleton("MY_INPUT_TOPIC"),
+                myBusinessProcessService::processRecord
+        );
+    }
+```
+
+# Code References
 This library heavily relies on an original version from @jeanlouisboudart : https://github.com/jeanlouisboudart/retriable-consumer
 
 

@@ -18,9 +18,9 @@
  */
 package com.michelin.kafka.error;
 
-import com.michelin.kafka.avro.GenericErrorModel;
+import com.michelin.kafka.ErrorProcessor;
+import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import java.io.*;
-import java.nio.ByteBuffer;
 import java.util.*;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,15 +31,21 @@ import org.apache.kafka.common.errors.RecordDeserializationException;
 @AllArgsConstructor
 public class RetryableConsumerErrorHandler<K, V> {
 
-    private final DeadLetterProducer deadLetterProducer;
+    private final ErrorProcessor<ConsumerRecord<K, V>> errorProcessor;
 
     private final List<Class<? extends Exception>> notRetryableExceptions = new ArrayList<>();
 
     public RetryableConsumerErrorHandler(
-            DeadLetterProducer deadLetterProducer, Collection<String> notRetryableExceptions) {
-        this.deadLetterProducer = deadLetterProducer;
-        convertStringToException(notRetryableExceptions).forEach(this::addNotRetryableExceptions);
+            KafkaRetryableConfiguration kafkaRetryableConfiguration,
+            ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
+        this.errorProcessor = errorProcessor;
+        convertStringToException(kafkaRetryableConfiguration.getConsumer().getNotRetryableExceptions())
+                .forEach(this::addNotRetryableExceptions);
         this.initDefaultRetryableExceptions();
+    }
+
+    public RetryableConsumerErrorHandler(KafkaRetryableConfiguration kafkaRetryableConfiguration) {
+        this(kafkaRetryableConfiguration, new DefaultErrorProcessor<>(kafkaRetryableConfiguration));
     }
 
     private void initDefaultRetryableExceptions() {
@@ -56,94 +62,12 @@ public class RetryableConsumerErrorHandler<K, V> {
         return !notRetryableExceptions.contains(exceptionType);
     }
 
-    public void handleConsumerDeserializationError(RecordDeserializationException e) {
-        if (e != null) {
-            this.handleError(
-                    e.getMessage(),
-                    null,
-                    e.offset(),
-                    e.topicPartition().partition(),
-                    e.topicPartition().topic(),
-                    e,
-                    null,
-                    null);
-        }
-    }
-
-    public void handleError(Throwable throwable, ConsumerRecord<K, V> consumerRecord, Long retryNumber) {
-        if (throwable != null) {
-            this.handleError(
-                    throwable.getMessage(),
-                    "Error processing record after" + retryNumber + " retry(ies).",
-                    consumerRecord.offset(),
-                    consumerRecord.partition(),
-                    consumerRecord.topic(),
-                    throwable,
-                    consumerRecord.key(),
-                    consumerRecord.value());
-        }
+    public void handleError(Throwable throwable, ConsumerRecord<K, V> consumerRecord, Long retryCount) {
+        this.errorProcessor.processError(throwable, consumerRecord, retryCount);
     }
 
     public void handleError(Throwable throwable, ConsumerRecord<K, V> consumerRecord) {
-        handleError(throwable, consumerRecord, 0L);
-    }
-
-    public void handleError(
-            String cause,
-            String context,
-            Long offset,
-            Integer partition,
-            String topic,
-            Throwable exception,
-            K key,
-            V value) {
-        try {
-            GenericErrorModel errorAvroObject = GenericErrorModel.newBuilder()
-                    .setCause(cause)
-                    .setContextMessage(context)
-                    .setOffset(offset)
-                    .setPartition(partition)
-                    .setTopic(topic)
-                    .build();
-            if (exception != null) {
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                exception.printStackTrace(pw);
-                errorAvroObject.setStack(sw.toString());
-            }
-            if (value != null) {
-                if (value instanceof String s) {
-                    errorAvroObject.setValue(s);
-                } else {
-                    errorAvroObject.setByteValue(toByteBuffer((Serializable) value));
-                }
-            }
-            if (key != null) {
-                if (key instanceof String s) {
-                    errorAvroObject.setKey(s);
-                } else {
-                    errorAvroObject.setByteKey(toByteBuffer((Serializable) key));
-                }
-            }
-
-            // Build the producer and send message
-            deadLetterProducer.send(UUID.randomUUID().toString(), errorAvroObject);
-
-        } catch (Exception e) {
-
-            log.error("An error occurred during error management... good luck with that!", e);
-        }
-    }
-
-    public static ByteBuffer toByteBuffer(Serializable obj) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ObjectOutputStream oos = new ObjectOutputStream(baos);
-        oos.writeObject(obj);
-        oos.flush();
-        ByteBuffer buffer = ByteBuffer.wrap(baos.toByteArray());
-        oos.close();
-        baos.close();
-        return buffer;
+        this.errorProcessor.processError(throwable, consumerRecord, 0L);
     }
 
     public static List<Class<? extends Exception>> convertStringToException(Collection<String> exceptionNames) {
