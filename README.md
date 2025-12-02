@@ -36,7 +36,6 @@ This lib is proposed to ease the usage of kafka for simple data consumer with ex
 - Custom Error processing
 
 ### To be implemented
-- Implement core lib Log&Fail feature
 - Health checks in core library for non springboot projects
 - Springboot starter with core lib health checks integration 
 
