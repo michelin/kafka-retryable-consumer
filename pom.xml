@@ -42,6 +42,7 @@
 
     <modules>
         <module>retryable-consumer-core</module>
+        <module>retryable-consumer-spring-boot-starter</module>
     </modules>
 
     <scm>
@@ -78,6 +79,7 @@
         <sonar.organization>michelin</sonar.organization>
         <sonar.projectKey>michelin_kafka-retryable-consumer</sonar.projectKey>
         <spotless-maven-plugin.version>2.44.5</spotless-maven-plugin.version>
+        <spring-boot.version>3.5.5</spring-boot.version>
     </properties>
 
     <dependencies>
