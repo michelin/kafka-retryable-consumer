@@ -298,7 +298,7 @@ class RetryableBatchConsumerTest {
         try (RetryableBatchConsumer<String, String> batchConsumer1 = new RetryableBatchConsumer<>("test")) {
             assertNotNull(batchConsumer1);
         } catch (Exception e) {
-            assertEquals(KafkaException.class, e.getClass());
+            assertInstanceOf(org.apache.kafka.common.KafkaException.class, e);
         }
 
         KafkaRetryableConfiguration config = KafkaRetryableConfiguration.load();
@@ -306,7 +306,7 @@ class RetryableBatchConsumerTest {
                 new RetryableBatchConsumer<>(config, customErrorProcessor)) {
             assertNotNull(batchConsumer2);
         } catch (Exception e) {
-            assertEquals(KafkaException.class, e.getClass());
+            assertInstanceOf(org.apache.kafka.common.KafkaException.class, e);
         }
 
         try (RetryableBatchConsumer<String, String> batchConsumer3 =

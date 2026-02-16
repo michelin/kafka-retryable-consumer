@@ -1,0 +1,34 @@
+kafka:
+    retryable:
+        consumer:
+            not-retryable-exceptions:
+                - java.lang.NullPointerException
+                - java.lang.IllegalArgumentException
+            stop-on-error: true
+            retry:
+                max: 10
+                backoff:
+                    ms: 1000
+            poll:
+                backoff:
+                    ms: 2345
+            properties:
+                application:
+                    id: retryable-consumer-test
+                bootstrap:
+                    servers: fake.server:9092
+                specific:
+                    avro:
+                        reader: true
+                key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+                value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+            topics: TOPIC
+        dead-letter:
+            producer:
+                properties:
+                    application:
+                        id: dl-producer-test
+                    bootstrap:
+                        servers: fake.server:9092
+                topic: DL_TOPIC
+        name: test-retry-consumer
