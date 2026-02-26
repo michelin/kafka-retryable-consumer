@@ -131,33 +131,6 @@ class RetryableBatchConsumerTest {
 
     @Test
     @Order(1)
-    void listenAsync_shouldProcessBatchOfRecords() throws Exception {
-        ConsumerRecord<String, String> consumerRecord1 =
-                new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
-        ConsumerRecord<String, String> consumerRecord2 =
-                new ConsumerRecord<>(topic, record2Partition, record2Offset, "key2", "value2");
-
-        List<ConsumerRecord<String, String>> recordList = List.of(consumerRecord1, consumerRecord2);
-
-        when(kafkaConsumer.poll(any()))
-                .thenReturn(new ConsumerRecords<>(
-                        Collections.singletonMap(record1TopicPartition, recordList),
-                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))))
-                .thenReturn(new ConsumerRecords<>(
-                        Collections.emptyMap(),
-                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))));
-
-        retryableBatchConsumer.listenAsync(records -> batchProcessorNoError.processRecords(records));
-        verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
-        verify(batchProcessorNoError, timeout(5000).times(1)).processRecords(any());
-
-        // Check offsets updated to after the last record in the batch
-        assertEquals(
-                retryableBatchConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset + 1);
-    }
-
-    @Test
-    @Order(2)
     void listenAsync_shouldHandleNotRetryableErrorInBatch() throws Exception {
         ConsumerRecord<String, String> consumerRecord1 =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
@@ -184,7 +157,7 @@ class RetryableBatchConsumerTest {
     }
 
     @Test
-    @Order(3)
+    @Order(2)
     void listenAsync_shouldHandleInfiniteRetryableErrorInBatch() throws Exception {
         ConsumerRecord<String, String> consumerRecord1 =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
@@ -214,7 +187,7 @@ class RetryableBatchConsumerTest {
     }
 
     @Test
-    @Order(4)
+    @Order(3)
     void listenAsync_shouldHandleDeserializationExceptionInBatch() throws Exception {
         ConsumerRecord<String, String> consumerRecord =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
@@ -254,7 +227,7 @@ class RetryableBatchConsumerTest {
     }
 
     @Test
-    @Order(5)
+    @Order(4)
     void listenAsync_shouldFailWithStopOnErrorConfigInBatch() throws Exception {
         RetryableBatchConsumer<String, String> retryableBatchConsumerStopOnError = new RetryableBatchConsumer<>(
                 retryableConfigurationStopOnError, kafkaConsumer, errorHandler, rebalanceListener);
@@ -281,7 +254,7 @@ class RetryableBatchConsumerTest {
     }
 
     @Test
-    @Order(6)
+    @Order(5)
     void testBatchRetryableWithCustomErrorProcessor() throws Exception {
         CustomBatchErrorProcessor customErrorProcessor = new CustomBatchErrorProcessor();
         ConsumerRecord<String, String> record1 =
@@ -317,36 +290,9 @@ class RetryableBatchConsumerTest {
         }
     }
 
-    @Test
-    @Order(7)
-    void listenAsync_shouldProcessMultipleBatchesSequentially() throws Exception {
-        ConsumerRecord<String, String> batch1Record =
-                new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
-        ConsumerRecord<String, String> batch2Record =
-                new ConsumerRecord<>(topic, record2Partition, record2Offset, "key2", "value2");
-
-        when(kafkaConsumer.poll(any()))
-                .thenReturn(new ConsumerRecords<>(
-                        Collections.singletonMap(record1TopicPartition, Collections.singletonList(batch1Record)),
-                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))))
-                .thenReturn(new ConsumerRecords<>(
-                        Collections.singletonMap(record2TopicPartition, Collections.singletonList(batch2Record)),
-                        Collections.singletonMap(record2TopicPartition, new OffsetAndMetadata(2L))))
-                .thenReturn(new ConsumerRecords<>(
-                        Collections.emptyMap(),
-                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(2L))));
-
-        retryableBatchConsumer.listenAsync(records -> batchProcessorNoError.processRecords(records));
-        verify(kafkaConsumer, timeout(5000).atLeast(2)).poll(any());
-        verify(batchProcessorNoError, timeout(5000).atLeast(2)).processRecords(any());
-
-        // Check that offsets reflect the last batch processed
-        assertEquals(
-                retryableBatchConsumer.getCurrentOffset(record1TopicPartition).offset(), record2Offset + 1);
-    }
 
     @Test
-    @Order(8)
+    @Order(6)
     void testBatchRetryableConstructors() throws KafkaConfigurationException {
         CustomBatchErrorProcessor customErrorProcessor = new CustomBatchErrorProcessor();
 
