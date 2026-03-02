@@ -24,7 +24,6 @@ import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.WakeupException;
 
 /**
  * A batch-mode alternative to {@link RetryableConsumer} that processes records in batches instead of one by one, while
@@ -91,7 +90,7 @@ public class RetryableBatchConsumer<K, V>
 
         // Batch processed successfully: update internal offsets for all records
         for (ConsumerRecord<K, V> r : records) {
-         updateInternalOffsetsPosition(r);
+            updateInternalOffsetsPosition(r);
         }
 
         // If retry counter was incremented, reset it since the batch succeeded
