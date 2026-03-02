@@ -290,7 +290,6 @@ class RetryableBatchConsumerTest {
         }
     }
 
-
     @Test
     @Order(6)
     void testBatchRetryableConstructors() throws KafkaConfigurationException {

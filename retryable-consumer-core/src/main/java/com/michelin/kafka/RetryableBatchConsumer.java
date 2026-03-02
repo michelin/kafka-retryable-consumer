@@ -90,9 +90,9 @@ public class RetryableBatchConsumer<K, V>
         batchProcessor.processRecords(records);
 
         // Batch processed successfully: update internal offsets for all records
-        //for (ConsumerRecord<K, V> r : records) {
-            //updateInternalOffsetsPosition(r);
-        //}
+        // for (ConsumerRecord<K, V> r : records) {
+        // updateInternalOffsetsPosition(r);
+        // }
 
         // If retry counter was incremented, reset it since the batch succeeded
         if (this.retryCounter > 0) {
