@@ -90,9 +90,9 @@ public class RetryableBatchConsumer<K, V>
         batchProcessor.processRecords(records);
 
         // Batch processed successfully: update internal offsets for all records
-        // for (ConsumerRecord<K, V> r : records) {
-        // updateInternalOffsetsPosition(r);
-        // }
+        for (ConsumerRecord<K, V> r : records) {
+         updateInternalOffsetsPosition(r);
+        }
 
         // If retry counter was incremented, reset it since the batch succeeded
         if (this.retryCounter > 0) {
@@ -101,21 +101,6 @@ public class RetryableBatchConsumer<K, V>
         }
 
         log.debug("Batch of {} records processed successfully", records.count());
-    }
-
-    @Override
-    protected void doCommitSync() {
-        try {
-            log.debug("Committing whole batch");
-            consumer.commitSync();
-        } catch (WakeupException e) {
-            this.doCommitSync();
-            throw e;
-        } catch (CommitFailedException e) {
-            log.warn(
-                    "Commit failed Normal : due to rebalance. If this persists there may be issues with configuration or infrastructure",
-                    e);
-        }
     }
 
     @Override
