@@ -190,12 +190,27 @@ If you need to build custom error processing (ex: log additional metrics, send a
 you can implement `ErrorProcessor` interface :
 
 ```java  
-    @Slf4j    public class CustomErrorProcessor implements ErrorProcessor<ConsumerRecord<String, MyAvroObject>> {        @Override        public void processError(Throwable throwable, ConsumerRecord<String, MyAvroObject> record, Exception exception, int retryAttemptCount) {            // Your custom error processing here            log.error("...");        }    }  
+    @Slf4j
+    public class CustomErrorProcessor implements ErrorProcessor<ConsumerRecord<String, MyAvroObject>> {
+        @Override
+        public void processError(Throwable throwable, ConsumerRecord<String, MyAvroObject> record, Exception exception, int retryAttemptCount) {
+            // Your custom error processing here
+            log.error("...");
+        }
+    }
 ```  
 
 Then inject this custom error processor in your RetryableConsumer constructor :
 ```java  
-    try(RetryableConsumer<String, MyAvroObject> retryableConsumer = new RetryableConsumer<>(            retryableConsumerConfiguration,            new CustomErrorProcessor()    )) {        retryableConsumer.listen(                Collections.singleton("MY_INPUT_TOPIC"),                myBusinessProcessService::processRecord        );    }  
+    try(RetryableConsumer<String, MyAvroObject> retryableConsumer = new RetryableConsumer<>(
+            retryableConsumerConfiguration,
+            new CustomErrorProcessor()
+    )) {
+            retryableConsumer.listen(
+                Collections.singleton("MY_INPUT_TOPIC"),
+                myBusinessProcessService::processRecord
+            );
+    }  
 ```  
 
 # Code References
