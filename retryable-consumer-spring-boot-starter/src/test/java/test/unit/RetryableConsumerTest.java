@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.michelin.kafka.test.unit;
+package test.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -36,7 +36,10 @@ import java.util.Collections;
 import java.util.List;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.record.TimestampType;
@@ -175,9 +178,7 @@ class RetryableConsumerTest {
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
                         )); // all subsequent calls return empty record list
 
-        doThrow(new RetryableConsumerTest.CustomNotRetryableException())
-                .when(recordProcessorNoError)
-                .processRecord(record2);
+        doThrow(new CustomNotRetryableException()).when(recordProcessorNoError).processRecord(record2);
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
         verify(kafkaConsumer, timeout(5000).atLeastOnce()).poll(any());
@@ -213,9 +214,7 @@ class RetryableConsumerTest {
                         Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next record
                         )); // all subsequent calls return empty record list
 
-        doThrow(new RetryableConsumerTest.CustomRetryableException())
-                .when(recordProcessorNoError)
-                .processRecord(record2);
+        doThrow(new CustomRetryableException()).when(recordProcessorNoError).processRecord(record2);
 
         retryableConsumer.listenAsync(r -> recordProcessorNoError.processRecord(r));
 
@@ -334,7 +333,7 @@ class RetryableConsumerTest {
                             Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L)) // next records
                             )); // all subsequent calls return empty record list
 
-            doThrow(new RetryableConsumerTest.CustomNotRetryableException("Test Custom Error Processor"))
+            doThrow(new CustomNotRetryableException("Test Custom Error Processor"))
                     .when(recordProcessorNoError)
                     .processRecord(record2);
 

@@ -20,6 +20,7 @@ package com.michelin.kafka;
 
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
+import com.michelin.kafka.error.DeadLetterProducer;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -34,27 +35,46 @@ public class RetryableConsumer<K, V>
 
     private ConsumerRecord<K, V> currentProcessingRecord;
 
-    /** Default constructor with no parameters */
+    /** Default constructor with name only */
     public RetryableConsumer(String name) throws KafkaConfigurationException {
         super(name);
     }
 
-    /** Default constructor with no parameters */
+    /** Default constructor with name and custom error processor */
     public RetryableConsumer(String name, ErrorProcessor<ConsumerRecord<K, V>> errorProcessor)
             throws KafkaConfigurationException {
         super(name, errorProcessor);
     }
 
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     * @param errorProcessor error processor to set
+     */
     public RetryableConsumer(
             KafkaRetryableConfiguration kafkaRetryableConfiguration,
             ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
         super(kafkaRetryableConfiguration, errorProcessor);
     }
 
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     */
     public RetryableConsumer(KafkaRetryableConfiguration kafkaRetryableConfiguration) {
         super(kafkaRetryableConfiguration);
     }
 
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     * @param consumer kafka consumer to set
+     * @param errorProcessor error processor to set
+     * @param rebalanceListener rebalance listener to set
+     */
     public RetryableConsumer(
             KafkaRetryableConfiguration kafkaRetryableConfiguration,
             KafkaConsumer<K, V> consumer,
@@ -63,6 +83,13 @@ public class RetryableConsumer<K, V>
         super(kafkaRetryableConfiguration, consumer, errorProcessor, rebalanceListener);
     }
 
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     * @param consumer kafka consumer to set
+     * @param errorProcessor error processor to set
+     */
     public RetryableConsumer(
             KafkaRetryableConfiguration kafkaRetryableConfiguration,
             KafkaConsumer<K, V> consumer,
@@ -70,6 +97,14 @@ public class RetryableConsumer<K, V>
         super(kafkaRetryableConfiguration, consumer, errorProcessor);
     }
 
+    /**
+     * Constructor with parameters
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     * @param consumer kafka consumer to set
+     * @param errorHandler error handler to set
+     * @param rebalanceListener rebalance listener to set
+     */
     public RetryableConsumer(
             KafkaRetryableConfiguration kafkaRetryableConfiguration,
             KafkaConsumer<K, V> consumer,
@@ -78,24 +113,18 @@ public class RetryableConsumer<K, V>
         super(kafkaRetryableConfiguration, consumer, errorHandler, rebalanceListener);
     }
 
-    @Override
-    protected void processRecords(
-            RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor, ConsumerRecords<K, V> records)
-            throws Exception {
-        for (ConsumerRecord<K, V> r : records) {
-            log.debug("Begin processing of record with key {} ...", r.key());
-            this.currentProcessingRecord = r;
-            recordProcessor.processRecord(r);
-            updateInternalOffsetsPosition(r);
-
-            if (this.retryCounter > 0) {
-                log.info("Previously failing record processing is now successful, retry counter set to 0");
-                this.retryCounter = 0;
-            }
-            log.debug("Processing of record with key {} completed successfully", r.key());
-            this.currentProcessingRecord = null;
-        }
+    /**
+     * Constructor allowing a pre-built DeadLetterProducer to be injected.
+     *
+     * @param kafkaRetryableConfiguration kafka properties to set
+     * @param deadLetterProducer the DeadLetterProducer to use for error handling
+     */
+    public RetryableConsumer(
+            KafkaRetryableConfiguration kafkaRetryableConfiguration, DeadLetterProducer deadLetterProducer) {
+        super(kafkaRetryableConfiguration, deadLetterProducer);
     }
+
+    // -----
 
     @Override
     protected void handleProcessingException(Exception e) {
@@ -110,6 +139,28 @@ public class RetryableConsumer<K, V>
                         this.currentProcessingRecord.offset());
             });
             log.debug("Processing of record with key {} completed with error", this.currentProcessingRecord.key());
+        }
+    }
+
+    @Override
+    protected void processRecords(
+            RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor, ConsumerRecords<K, V> records)
+            throws Exception {
+        for (ConsumerRecord<K, V> r : records) {
+            log.debug("Begin processing of record with key {} ...", r.key());
+            this.currentProcessingRecord = r;
+            recordProcessor.processRecord(r); // Call business processor for each polled records
+            updateInternalOffsetsPosition(r); // previous processing is, ok let's update our internal offset map
+
+            // if we get there, it means at least the 1st record of the poll has been processed
+            // if the retryCounter has been incremented, it means this record was previously in error
+            // but the retry has worked, and the record is now processed => Let's re init retry counter
+            if (this.retryCounter > 0) {
+                log.info("Previously failing record processing is now successful, retry counter set to 0");
+                this.retryCounter = 0;
+            }
+            log.debug("Processing of record with key {} completed successfully", r.key());
+            this.currentProcessingRecord = null;
         }
     }
 
