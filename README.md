@@ -59,8 +59,12 @@ Insert retryable-consumer-core dependency in your POM :
 
 Then in your code, on a retryable consumer just call ```java listen(topics)``` method :
 ```java  
-try(RetryableConsumer<String, String> retryableConsumer = new RetryableConsumer<>()) {  
-    retryableConsumer.listen(        Collections.singleton("MY_TOPIC"), //Topic name        businessProcessor::processRecord //Function process called by RetryableConsumer for each record    );}
+try(RetryableConsumer<String, String> retryableConsumer = new RetryableConsumer<>()) {
+    retryableConsumer.listen(
+        Collections.singleton("MY_TOPIC"), //Topic name
+        businessProcessor::processRecord //Function process called by RetryableConsumer for each record
+    );
+}
 ```  
 `businessProcessor` must be your own processing classe with a method (`processRecord` in this example) accepting one  
 `ConsumerRecord<K, V>` as input.
@@ -74,8 +78,36 @@ or `application.yaml` or `application.properties`.
 Example of application.yml :
 
 ```yaml  
-kafka:  
-  retryable:    name: test-retry-consumer # name of the retryable consumer    consumer: # All retryable consumer properties      not-retryable-exceptions: # List of exceptions that will be ignored by the retry mechanism        - java.lang.NullPointerException        - java.lang.IllegalArgumentException      stop-on-error: false # If true, the consumer will completely stop on not retryable error. Default value = false      retry: # Retry configuration        max: 10 # Maximum number of retry. 0 means infinite retry. Default value = 0      poll:        backoff:          ms: 2345 # The time, in milliseconds, spent waiting in poll if data is not available in the buffer.      properties: # All Kafka server configuration, please add your custom kafka consumer config here        application:          id: retryable-consumer-test        bootstrap:          servers: fake.server:9092        specific:          avro:            reader: true      topics: TOPIC # List of topics to listen to. Not mandatory    dead-letter:      producer:        properties: # All Kafka server configuration for the dlq producer, please add your custom kafka producer config here          application:            id: dl-producer-test          bootstrap:            servers: fake.server:9092        topic: DL_TOPIC      
+kafka:
+  retryable:
+    name: test-retry-consumer # name of the retryable consumer
+    consumer: # All retryable consumer properties
+      not-retryable-exceptions: # List of exceptions that will be ignored by the retry mechanism
+        - java.lang.NullPointerException
+        - java.lang.IllegalArgumentException
+      stop-on-error: false # If true, the consumer will completely stop on not retryable error. Default value = false
+      retry: # Retry configuration
+        max: 10 # Maximum number of retry. 0 means infinite retry. Default value = 0
+      poll:
+        backoff:
+          ms: 2345 # The time, in milliseconds, spent waiting in poll if data is not available in the buffer.
+      properties: # All Kafka server configuration, please add your custom kafka consumer config here
+        application:
+          id: retryable-consumer-test
+        bootstrap:
+          servers: fake.server:9092
+        specific:
+          avro:
+            reader: true
+      topics: TOPIC # List of topics to listen to. Not mandatory
+    dead-letter:
+      producer:
+        properties: # All Kafka server configuration for the dlq producer, please add your custom kafka producer config here
+          application:
+            id: dl-producer-test
+          bootstrap:
+            servers: fake.server:9092
+        topic: DL_TOPIC
 ```  
 
 ## Springboot
