@@ -178,23 +178,41 @@ public RetryableConsumer<String, MyValue> customRetryableConsumer(KafkaRetryable
 
 - If tests fail with Kafka client DNS/connection errors in CI, ensure tests either mock Kafka clients or run integration tests against Embedded Kafka. Unit tests should remain network-free.
 
+## Contribution & Development
+
+- Run unit tests for the starter module:
+
+```bash
+mvn -am -pl retryable-consumer-spring-boot-starter test
+```
+
+- To run core module tests:
+
+```bash
+mvn -pl retryable-consumer-core -Dtest=com.michelin.kafka.test.unit.RetryableConsumerTest test
+```
 
 ## Configuration
 
+Configuration key prefix`kafka.retryable` :
+
 | Configuration key                               | Value Type         | Default Value | Description                                                  | Note                                                               |
-| ----------------------------------------------- | ------------------ | ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ |
-| kafka.retryable.enabled                         | boolean            | true          | Toggle the auto-configuration on/off                         | Only available with retryable-consumer-spring-boot-starter library |
-| kafka.retryable.consumer.topics                 | Collection<String> | none          | Input consumer topic list                                    | Mandatory                                                          |
-| kafka.retryable.consumer.properties             | Properties         | none          | All standard Kafka Consumer configuration properties         | bootstrap.servers, key.deserializer, value.deserializer ...etc     |
-| kafka.retryable.consumer.pollBackoffMs          | Long               | 1000          | Timeout duration in ms for polling                           | Optional                                                           |
-| kafka.retryable.consumer.retryBackoffMs         | Long               | 0             | Circuit breaker backoff between each retry                   | Optional                                                           |
-| kafka.retryable.consumer.retryMax               | Long               | 0             | Circuit breaker max number of retry                          | Optional                                                           |
-| kafka.retryable.consumer.notRetryableExceptions | Collection<String> | empty list    | List of not retryable exception when retry option is enabled | Optional                                                           |
-| kafka.retryable.consumer.stopOnError            | boolean            | false         | Fully stop consumer on error                                 | Optional                                                           |
-| kafka.retryable.dead-letter.producer.topic      | String             | none          | Dead Letter Queue topic                                      |                                                                    |
+|-------------------------------------------------| ------------------ | ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| enabled                                         | boolean            | true          | Toggle the auto-configuration on/off                         | Only available with retryable-consumer-spring-boot-starter library |
+| topics                                          | Collection<String> | none          | Input consumer topic list                                    | Mandatory                                                          |
+| properties                                      | Properties         | none          | All standard Kafka Consumer configuration properties         | bootstrap.servers, key.deserializer, value.deserializer ...etc     |
+| pollBackoffMs                                   | Long               | 1000          | Timeout duration in ms for polling                           | Optional                                                           |
+| retryBackoffMs                                  | Long               | 0             | Circuit breaker backoff between each retry                   | Optional                                                           |
+| retryMax                                        | Long               | 0             | Circuit breaker max number of retry                          | Optional                                                           |
+| notRetryableExceptions                          | Collection<String> | empty list    | List of not retryable exception when retry option is enabled | Optional                                                           |
+| stopOnError                                     | boolean            | false         | Fully stop consumer on error                                 | Optional                                                           |
+
+Configuration key prefix`kafka.retryable.dead-letter.producer` :
+
+| Configuration key                               | Value Type         | Default Value | Description                                                  | Note                                                               |
+|-------------------------------------------------| ------------------ | ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| topic                                           | String             | none          | Dead Letter Queue topic                                      |                                                                    |
 | kafka.retryable.dead-letter.producer.properties | Properties         | none          | All standard Kafka Producer configuration properties         | bootstrap.servers, key.serializer, value.serializer ...etc         |
-
-
 
 ## Customization
 ### Dead Letter Queue (DLQ)
