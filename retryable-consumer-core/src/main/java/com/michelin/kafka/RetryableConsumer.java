@@ -46,7 +46,8 @@ public class RetryableConsumer<K, V>
         super(name, errorProcessor);
     }
 
-    /** Constructor with parameters
+    /**
+     * Constructor with parameters
      *
      * @param kafkaRetryableConfiguration kafka properties to set
      * @param errorProcessor error processor to set
@@ -57,8 +58,8 @@ public class RetryableConsumer<K, V>
         super(kafkaRetryableConfiguration, errorProcessor);
     }
 
-
-    /** Constructor with parameters
+    /**
+     * Constructor with parameters
      *
      * @param kafkaRetryableConfiguration kafka properties to set
      */
@@ -66,7 +67,8 @@ public class RetryableConsumer<K, V>
         super(kafkaRetryableConfiguration);
     }
 
-    /** Constructor with parameters
+    /**
+     * Constructor with parameters
      *
      * @param kafkaRetryableConfiguration kafka properties to set
      * @param consumer kafka consumer to set
@@ -81,7 +83,8 @@ public class RetryableConsumer<K, V>
         super(kafkaRetryableConfiguration, consumer, errorProcessor, rebalanceListener);
     }
 
-    /** Constructor with parameters
+    /**
+     * Constructor with parameters
      *
      * @param kafkaRetryableConfiguration kafka properties to set
      * @param consumer kafka consumer to set
@@ -94,7 +97,8 @@ public class RetryableConsumer<K, V>
         super(kafkaRetryableConfiguration, consumer, errorProcessor);
     }
 
-    /** Constructor with parameters
+    /**
+     * Constructor with parameters
      *
      * @param kafkaRetryableConfiguration kafka properties to set
      * @param consumer kafka consumer to set
@@ -109,16 +113,16 @@ public class RetryableConsumer<K, V>
         super(kafkaRetryableConfiguration, consumer, errorHandler, rebalanceListener);
     }
 
-    /** Constructor allowing a pre-built DeadLetterProducer to be injected.
+    /**
+     * Constructor allowing a pre-built DeadLetterProducer to be injected.
+     *
      * @param kafkaRetryableConfiguration kafka properties to set
      * @param deadLetterProducer the DeadLetterProducer to use for error handling
      */
     public RetryableConsumer(
-            KafkaRetryableConfiguration kafkaRetryableConfiguration,
-            DeadLetterProducer deadLetterProducer) {
-        super(kafkaRetryableConfiguration,deadLetterProducer);
+            KafkaRetryableConfiguration kafkaRetryableConfiguration, DeadLetterProducer deadLetterProducer) {
+        super(kafkaRetryableConfiguration, deadLetterProducer);
     }
-
 
     // -----
 
@@ -140,8 +144,8 @@ public class RetryableConsumer<K, V>
 
     @Override
     protected void processRecords(
-            RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor,
-            ConsumerRecords<K, V> records) throws Exception {
+            RecordProcessor<ConsumerRecord<K, V>, Exception> recordProcessor, ConsumerRecords<K, V> records)
+            throws Exception {
         for (ConsumerRecord<K, V> r : records) {
             log.debug("Begin processing of record with key {} ...", r.key());
             this.currentProcessingRecord = r;
