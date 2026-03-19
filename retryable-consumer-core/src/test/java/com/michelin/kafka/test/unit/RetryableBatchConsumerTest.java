@@ -37,7 +37,6 @@ import java.util.List;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
-import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.record.TimestampType;
@@ -298,7 +297,7 @@ class RetryableBatchConsumerTest {
         try (RetryableBatchConsumer<String, String> batchConsumer1 = new RetryableBatchConsumer<>("test")) {
             assertNotNull(batchConsumer1);
         } catch (Exception e) {
-            assertEquals(KafkaException.class, e.getClass());
+            assertInstanceOf(org.apache.kafka.common.KafkaException.class, e);
         }
 
         KafkaRetryableConfiguration config = KafkaRetryableConfiguration.load();
@@ -306,7 +305,7 @@ class RetryableBatchConsumerTest {
                 new RetryableBatchConsumer<>(config, customErrorProcessor)) {
             assertNotNull(batchConsumer2);
         } catch (Exception e) {
-            assertEquals(KafkaException.class, e.getClass());
+            assertInstanceOf(org.apache.kafka.common.KafkaException.class, e);
         }
 
         try (RetryableBatchConsumer<String, String> batchConsumer3 =

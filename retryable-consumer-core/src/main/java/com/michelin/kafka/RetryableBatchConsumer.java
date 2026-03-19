@@ -112,7 +112,6 @@ public class RetryableBatchConsumer<K, V>
 
     @Override
     public OffsetAndMetadata getCurrentOffset(TopicPartition topicPartition) {
-
         return this.offsets.get(topicPartition);
     }
 }

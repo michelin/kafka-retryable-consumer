@@ -23,9 +23,12 @@ This lib is proposed to ease the usage of kafka for simple data consumer with ex
     * [Current version](#current-version)
     * [To be implemented](#to-be-implemented)
 * [Getting Started](#getting-started)
-  * [Vanilla Java](#vanilla-java)
-  * [Springboot](#springboot)
-* [Custom Error Processing](#custom-error-processing)
+    * [Vanilla Java](#vanilla-java)
+    * [Springboot](#springboot)
+* [Configuration](#configuration)
+* [Customisation](#customization)
+    * [Dead Letter Queue (DLQ)](#dead-letter-queue-dlq)
+    * [Custom Error Processing](#custom-error-processing)
 * [Code References](#code-references)
 
 ## Features
@@ -34,48 +37,47 @@ This lib is proposed to ease the usage of kafka for simple data consumer with ex
 - Automatic record commit management in case of error or partition rebalance
 - Retry on error with Exception exclusion management
 - Custom Error processing
+- Batch Record Processing
 
 ### To be implemented
 - Health checks in core library for non springboot projects
-- Springboot starter with core lib health checks integration 
-
 
 ## Getting started
 Kafka consumer libs repository hosts various libraries that might be usefull for your Kafka project.
 - retryable-consumer-core : Core library for easy retryable consumers implementation
-
+- retryable-consumer-springboot-starter : Spring Boot autoconfiguration for the Retryable Consumer core library
 ### Vanilla Java
 
 Insert retryable-consumer-core dependency in your POM :
-```xml
-<dependency>
-    <groupId>com.michelin.kafka</groupId>
-    <artifactId>retryable-consumer-core</artifactId>
+```xml  
+<dependency>  
+    <groupId>com.michelin.kafka</groupId>    
+    <artifactId>retryable-consumer-core</artifactId>    
     <version>${retryable-consumer-core.version}</version>
-</dependency>
-```
+</dependency>  
+```  
 
 Then in your code, on a retryable consumer just call ```java listen(topics)``` method :
-```java
+```java  
 try(RetryableConsumer<String, String> retryableConsumer = new RetryableConsumer<>()) {
     retryableConsumer.listen(
         Collections.singleton("MY_TOPIC"), //Topic name
         businessProcessor::processRecord //Function process called by RetryableConsumer for each record
     );
 }
-```
-`businessProcessor` must be your own processing classe with a method (`processRecord` in this example) accepting one
+```  
+`businessProcessor` must be your own processing classe with a method (`processRecord` in this example) accepting one  
 `ConsumerRecord<K, V>` as input.
 
-:warning: ```java listen(topics)``` method is blocker and will start an endless loop to consumer you topic record.
+:warning: ```java listen(topics)``` method is blocker and will start an endless loop to consumer you topic record.  
 If you need a non-blocking method, please use ```java listenAsync(topics)``` that returns a future.
 
-In order to work properly, the retryable consumer will try to load kafka configuration from `application.yml`
+In order to work properly, the retryable consumer will try to load kafka configuration from `application.yml`  
 or `application.yaml` or `application.properties`.
 
 Example of application.yml :
 
-```yaml
+```yaml  
 kafka:
   retryable:
     name: test-retry-consumer # name of the retryable consumer
@@ -106,112 +108,138 @@ kafka:
           bootstrap:
             servers: fake.server:9092
         topic: DL_TOPIC
-    
-```
+```  
 
 ## Springboot
 
-A Springboot starter should be build soon. Meanwhile, raw usage of Retryable Consumer CORE lib is possible in springboot.
+Add the starter as a dependency to your Spring Boot application:
 
-### Step 1: Plug your Springboot configuration file on "KafkaRetryableConfiguration" class
-
-Simply create a configuration that configuration class
-```java
-package com.michelin.oscp.huw.configuration;
-
-import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-@ConfigurationProperties(prefix = "kafka.retryable")
-public class RetryableConsumerConfiguration extends KafkaRetryableConfiguration {}
+```xml
+<dependency>
+  <groupId>com.michelin.kafka</groupId>
+  <artifactId>retryable-consumer-spring-boot-starter</artifactId>
+  <version><!-- project version -->${retryable-consumer-core.version}</version>
+</dependency>
 ```
 
-In this example, all retryable consumer configuration should be placed under "kafka.retryable" prefix in config file.
+Then configure properties in `application.yml` or `application.properties`.
 
-Example of application.yml
-```yaml 
+Example `application.yml` minimal:
+
+```yaml
 kafka:
   retryable:
-    name: myConsuimer # name of the retryable consumer (not mandatory)
-    consumer: # All retryable consumer properties
-      not-retryable-exceptions:
-        - java.lang.NullPointerException
-        - com.michelin.my.own.project.MyCustomException
-      retry-max: 3 # Retry configuration
-      poll:
-        backoff:
-          ms: 500 # The time, in milliseconds, spent waiting in poll if data is not available in the buffer.
-      properties: # All Kafka server configuration, please add your custom kafka consumer config here
-        auto.offset.reset: earliest
-        bootstrap.servers: mybootstrap-server:9092 # This is kafka dev cluster
-        schema.registry.url: https://my-schema-registry/dev/ # This is kafka dev sr
-        basic.auth.credentials.source: USER_INFO
-        basic.auth.user.info: user:user-secret
+    enabled: true
+    consumer:
+      topics:
+        - my-topic
+      properties:
+        bootstrap.servers: 127.0.0.1:9092
         key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
-        value.deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
-        specific.avro.reader: true #org.apache.avro.generic.GenericData$Record cannot be cast to HUWOutOrder # to solve this error. I added this config.
-        max.poll.interval.ms: 30000 #5 min
-        max.poll.records: 1
-        enable.auto.commit: false  # is this for both consumer and producer ?
-        fetch.min.bytes: 1
-        heartbeat.interval.ms: 3000
-        isolation.level: read_committed
-        group.id: prefix.myProject
-        sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="kafkaUser" password="kafkaSecret";
-        sasl.mechanism: PLAIN
-        security.protocol: SASL_SSL
-        session.timeout.ms: 45000
-        avro.remove.java.properties: true
-      topics: prefix.myTopic
-    dead-letter:
-      properties: # All Kafka server configuration for the dlq producer, please add your custom kafka producer config
-        bootstrap.servers: mybootstrap-server:9092 # This is kafka dev cluster
-        schema.registry.url: https://my-schema-registry/dev/ # This is kafka dev sr
-        basic.auth.credentials.source: USER_INFO
-        basic.auth.user.info: user:user-secret
-        acks: all
-        avro.remove.java.properties: true
-        enable.idempotence: true
-        sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="kafkaUser" password="kafkaSecret";
-        security.protocol: SASL_SSL
-        key.serializer: org.apache.kafka.common.serialization.StringSerializer
-        value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
-      topic: prefix.myTopicDeadLetterQ
+        value.deserializer: org.apache.kafka.common.serialization.StringDeserializer
 ```
 
-### Step 2: Build a Kafka consumer service
-
-Build a springboot service with a method that bootstrap the consumer.
-Then call this method whenever you are ready to start your consumer.
-
-We advise to put @Async annotation on this method to avoid blocking your springboot app while running
-the synchronous KafkaRetryableConsumer method ```listen(topics)```. (or use the ```listenAsync(topics)``` method)
-
-```java 
-    ...
-    @Autowired
-    private RetryableConsumerConfiguration retryableConsumerConfiguration;
-    ...
-    @Async
-    public void run(){
-        log.info("Starting Out Order Event Listener");
-
-        try(RetryableConsumer<String, MyAvroObject> retryableConsumer = new RetryableConsumer<>(retryableConsumerConfiguration)) {
-            retryableConsumer.listen(
-                    Collections.singleton("MY_INPUT_TOPIC"),
-                    myBusinessProcessService::processRecord
-            );
-        }
-    }
-```
-
-# Custom error processing
-If you need to build custom error processing (ex: log additional metrics, send alert, use a specific Dead Letter Queue format ...etc.),
-you can implement `ErrorProcessor` interface :
+This will create a `RetryableConsumer` bean with default behavior. To inject it into your code:
 
 ```java
+@Autowired
+private RetryableConsumer<String, String> retryableConsumer;
+```
+
+Then use `retryableConsumer.listen(...)` or `listenAsync(...)` with a `RecordProcessor`.
+### Advanced usage
+
+- If you want full control over the configuration object, define a `@Bean` of type `KafkaRetryableConfiguration` in your application context — the starter will not override it (it uses `@ConditionalOnMissingBean`).
+- You can also provide `KafkaRetryableSpringProperties` (for binding) instead of `KafkaRetryableConfiguration` and the mapper will convert it.
+
+Example customizing error handling:
+
+```java
+@Bean
+public RetryableConsumer<String, MyValue> customRetryableConsumer(KafkaRetryableConfiguration cfg, DeadLetterProducer dlq) {
+  // build a RetryableConsumer with custom ErrorProcessor or inject the DLQ
+  return new RetryableConsumer<>(cfg, dlq);
+}
+```
+
+### Testing notes
+
+- Unit tests in this module avoid creating real Kafka clients during Spring context refresh. The starter defers Kafka client construction (lazy) and provides defaults for deserializers/serializers in tests to avoid Kafka client ConfigExceptions.
+- For true integration tests against Kafka use `spring-kafka-test`'s `EmbeddedKafkaBroker` (create a separate integration test profile).
+- If tests are flaky due to async background processing, prefer synchronization helpers such as `CountDownLatch` or inject a test Executor.
+
+### Troubleshooting
+
+- Error: "Missing required property: kafka.retryable.consumer.topics must be configured and non-empty"
+    - Ensure `kafka.retryable.consumer.topics` is set in application properties or provide a `KafkaRetryableConfiguration` bean.
+
+- Error: "Missing required property: kafka.retryable.consumer.properties.bootstrap.servers must be configured"
+    - Add `bootstrap.servers` under `kafka.retryable.consumer.properties`.
+
+- If tests fail with Kafka client DNS/connection errors in CI, ensure tests either mock Kafka clients or run integration tests against Embedded Kafka. Unit tests should remain network-free.
+
+## Contribution & Development
+
+- Run unit tests for the starter module:
+
+```bash
+mvn -am -pl retryable-consumer-spring-boot-starter test
+```
+
+- To run core module tests:
+
+```bash
+mvn -pl retryable-consumer-core -Dtest=com.michelin.kafka.test.unit.RetryableConsumerTest test
+```
+
+## Configuration
+
+Configuration key prefix`kafka.retryable` :
+
+| Configuration key                               | Value Type         | Default Value | Description                                                  | Note                                                               |
+|-------------------------------------------------| ------------------ | ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| enabled                                         | boolean            | true          | Toggle the auto-configuration on/off                         | Only available with retryable-consumer-spring-boot-starter library |
+| topics                                          | Collection<String> | none          | Input consumer topic list                                    | Mandatory                                                          |
+| properties                                      | Properties         | none          | All standard Kafka Consumer configuration properties         | bootstrap.servers, key.deserializer, value.deserializer ...etc     |
+| pollBackoffMs                                   | Long               | 1000          | Timeout duration in ms for polling                           | Optional                                                           |
+| retryBackoffMs                                  | Long               | 0             | Circuit breaker backoff between each retry                   | Optional                                                           |
+| retryMax                                        | Long               | 0             | Circuit breaker max number of retry                          | Optional                                                           |
+| notRetryableExceptions                          | Collection<String> | empty list    | List of not retryable exception when retry option is enabled | Optional                                                           |
+| stopOnError                                     | boolean            | false         | Fully stop consumer on error                                 | Optional                                                           |
+
+Configuration key prefix`kafka.retryable.dead-letter.producer` :
+
+| Configuration key                               | Value Type         | Default Value | Description                                                  | Note                                                               |
+|-------------------------------------------------| ------------------ | ------------- | ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| topic                                           | String             | none          | Dead Letter Queue topic                                      |                                                                    |
+| kafka.retryable.dead-letter.producer.properties | Properties         | none          | All standard Kafka Producer configuration properties         | bootstrap.servers, key.serializer, value.serializer ...etc         |
+
+## Customization
+### Dead Letter Queue (DLQ)
+
+The DLQ is optional and will only be created if `kafka.retryable.dead-letter.producer.topic` is configured. If configured, the DLQ producer requires producer properties including `bootstrap.servers` and serializers.
+
+Example DLQ config:
+
+```yaml
+kafka:
+  retryable:
+    dead-letter:
+      producer:
+        topic: my-dlq
+        properties:
+          bootstrap.servers: 127.0.0.1:9092
+          key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          value.serializer: org.apache.kafka.common.serialization.StringSerializer
+```
+
+If you don't set serializers for the DLQ producer, the starter will provide sensible defaults (StringSerializer) for tests and simple setups.
+
+### Custom error processing
+If you need to build custom error processing (ex: log additional metrics, send alert, use a specific Dead Letter Queue format ...etc.),  
+you can implement `ErrorProcessor` interface :
+
+```java  
     @Slf4j
     public class CustomErrorProcessor implements ErrorProcessor<ConsumerRecord<String, MyAvroObject>> {
         @Override
@@ -220,23 +248,20 @@ you can implement `ErrorProcessor` interface :
             log.error("...");
         }
     }
-```
+```  
 
 Then inject this custom error processor in your RetryableConsumer constructor :
-```java
+```java  
     try(RetryableConsumer<String, MyAvroObject> retryableConsumer = new RetryableConsumer<>(
             retryableConsumerConfiguration,
             new CustomErrorProcessor()
     )) {
-        retryableConsumer.listen(
+            retryableConsumer.listen(
                 Collections.singleton("MY_INPUT_TOPIC"),
                 myBusinessProcessService::processRecord
-        );
-    }
-```
+            );
+    }  
+```  
 
 # Code References
-This library heavily relies on an original version from @jeanlouisboudart : https://github.com/jeanlouisboudart/retriable-consumer
-
-
-
+This library relies on an original version from @jeanlouisboudart : https://github.com/jeanlouisboudart/retriable-consumer

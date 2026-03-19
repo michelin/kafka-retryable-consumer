@@ -21,6 +21,8 @@ package com.michelin.kafka;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
+import com.michelin.kafka.error.DeadLetterProducer;
+import com.michelin.kafka.error.DefaultErrorProcessor;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import java.io.Closeable;
 import java.time.Duration;
@@ -50,13 +52,13 @@ import org.apache.kafka.common.errors.WakeupException;
 public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
 
     /** The Kafka consumer itself */
-    protected final Consumer<K, V> consumer;
+    protected Consumer<K, V> consumer;
 
     /** Consumer kafka configuration */
-    protected final KafkaRetryableConfiguration kafkaRetryableConfiguration;
+    protected KafkaRetryableConfiguration kafkaRetryableConfiguration;
 
     /** Listener for rebalancing */
-    protected final ConsumerRebalanceListener rebalanceListener;
+    protected ConsumerRebalanceListener rebalanceListener;
 
     /**
      * Map saving the current offset of TopicPartitions treated by this consumer. This offsets map is used to manage
@@ -89,18 +91,22 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
             KafkaRetryableConfiguration kafkaRetryableConfiguration,
             ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
         this.kafkaRetryableConfiguration = kafkaRetryableConfiguration;
-        this.consumer = new KafkaConsumer<>(
-                this.kafkaRetryableConfiguration.getConsumer().getProperties());
-        this.rebalanceListener = new RetryableConsumerRebalanceListener(consumer, offsets);
+
+        // consumer creation deferred until first use
+        this.consumer = null;
+        this.rebalanceListener = null;
+
         this.errorHandler = new RetryableConsumerErrorHandler<>(this.kafkaRetryableConfiguration, errorProcessor);
     }
 
     protected AbstractRetryableConsumer(KafkaRetryableConfiguration kafkaRetryableConfiguration) {
         this.kafkaRetryableConfiguration = kafkaRetryableConfiguration;
-        this.consumer = new KafkaConsumer<>(
-                this.kafkaRetryableConfiguration.getConsumer().getProperties());
+
+        // consumer creation deferred until first use
+        this.consumer = null;
+        this.rebalanceListener = null;
+
         this.errorHandler = new RetryableConsumerErrorHandler<>(this.kafkaRetryableConfiguration);
-        this.rebalanceListener = new RetryableConsumerRebalanceListener(consumer, offsets);
     }
 
     protected AbstractRetryableConsumer(
@@ -135,7 +141,26 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
         this.rebalanceListener = rebalanceListener;
     }
 
+    protected AbstractRetryableConsumer(
+            KafkaRetryableConfiguration kafkaRetryableConfiguration, DeadLetterProducer deadLetterProducer) {
+        this.kafkaRetryableConfiguration = kafkaRetryableConfiguration;
+        this.consumer = null; // lazy
+        this.rebalanceListener = null; // lazy
+        this.errorHandler = new RetryableConsumerErrorHandler<>(
+                kafkaRetryableConfiguration, new DefaultErrorProcessor<>(deadLetterProducer));
+    }
+
     // ---- Common utility methods ----
+
+    /** Ensure the KafkaConsumer and rebalance listener exist; construct them lazily on first use. */
+    protected synchronized void ensureConsumer() {
+        if (this.consumer == null) {
+            // create the KafkaConsumer from configuration properties
+            this.consumer = new KafkaConsumer<>(
+                    this.kafkaRetryableConfiguration.getConsumer().getProperties());
+            this.rebalanceListener = new RetryableConsumerRebalanceListener(this.consumer, offsets);
+        }
+    }
 
     /**
      * Jump to the offset of the next record.
@@ -145,6 +170,7 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
      */
     protected void skipCurrentOffset(TopicPartition topicPartition, long currentOffset) {
         offsets.put(topicPartition, new OffsetAndMetadata(currentOffset + 1));
+        ensureConsumer();
         consumer.seek(topicPartition, currentOffset + 1);
     }
 
@@ -154,6 +180,7 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
      * @return True if it is paused, false otherwise
      */
     protected boolean isConsumerPaused() {
+        ensureConsumer();
         return !this.consumer.paused().isEmpty();
     }
 
@@ -170,17 +197,20 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
     }
 
     /**
-     * Sync the current offsets with kafka cluster. Handle closing down exceptions and CommitFailedExceptions in case of
-     * rebalance.
+     * Sync the current offsets with kafka cluster Handle closing down exceptions and CommitFailedExceptions in case of
+     * rebalance
      *
      * <p><a href="https://docs.confluent.io/current/clients/java.html#synchronous-commits">Synchronous Commits on
      * confluent docs</a>
      */
     protected void doCommitSync() {
+        ensureConsumer();
         try {
             log.debug("Committing offsets {}", offsets);
             consumer.commitSync(offsets);
         } catch (WakeupException e) {
+            // we're shutting down, but finish the commit first and then
+            // rethrow the exception so that the main loop can exit
             this.doCommitSync();
             throw e;
         } catch (CommitFailedException e) {
@@ -192,8 +222,9 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
 
     /** Seek the consumer to the latest in memory saved offsets */
     protected void seekAndCommitToLatestSuccessfulOffset() {
+        ensureConsumer();
         consumer.assignment().forEach(tp -> {
-            if (offsets.containsKey(tp)) {
+            if (offsets.containsKey(tp)) { // some offset has been processed for this partition
                 if (offsets.get(tp) != null) {
                     consumer.seek(tp, offsets.get(tp));
                     consumer.commitSync();
@@ -205,6 +236,8 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
                             tp.toString());
                 }
             } else {
+                // This assigned topic partition is not present in our in memory offsets
+                // => Let's seek beginning of end of partition
                 String autoOffsetReset = (String) this.kafkaRetryableConfiguration
                         .getConsumer()
                         .getProperties()
@@ -222,6 +255,14 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
 
     // ---- Listen / ListenAsync (Template Method pattern) ----
 
+    /**
+     * This method will start a blocking Kafka the consumer that will run in background. The listened topics are the one
+     * in the configuration file. Warning : this method is blocker. If you need an asynchronous consumer, use
+     * listenAsync method.
+     *
+     * @param processor processor function to process every received records
+     * @param errorProcessor processor function to be called whenever an unrecoverable error is detected
+     */
     public void listen(P processor, ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
         if (kafkaRetryableConfiguration.getConsumer().getTopics() == null
                 || kafkaRetryableConfiguration.getConsumer().getTopics().isEmpty()) {
@@ -230,6 +271,13 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
         this.listen(kafkaRetryableConfiguration.getConsumer().getTopics(), processor, errorProcessor);
     }
 
+    /**
+     * This method will start a blocking Kafka the consumer that will run in background. The listened topics are the one
+     * in the configuration file. Warning : this method is blocker. If you need an asynchronous consumer, use
+     * listenAsync method.
+     *
+     * @param processor processor function to process every received records
+     */
     public void listen(P processor) {
         if (kafkaRetryableConfiguration.getConsumer().getTopics() == null
                 || kafkaRetryableConfiguration.getConsumer().getTopics().isEmpty()) {
@@ -238,13 +286,29 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
         this.listen(kafkaRetryableConfiguration.getConsumer().getTopics(), processor);
     }
 
+    /**
+     * This method will start a blocking Kafka the consumer that will run in background. The listened topics are the one
+     * in topics parameter. (Topics list of the configuration file is ignored). Warning : this method is blocker. If you
+     * need an asynchronous consumer, use listenAsync
+     *
+     * @param processor processor function to process every received records
+     */
     public void listen(Collection<String> topics, P processor) {
         this.listen(topics, processor, null);
     }
 
+    /**
+     * This method will start a blocking Kafka the consumer that will run in background. The listened topics are the one
+     * in topics parameter. (Topics list of the configuration file is ignored). Warning : this method is blocker. If you
+     * need an asynchronous consumer, use listenAsync
+     *
+     * @param processor record(s) processor function to process every received records
+     * @param errorProcessor processor function to be called whenever an unrecoverable error is detected
+     */
     public void listen(Collection<String> topics, P processor, ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
         log.info("Starting consumer for topics {}", topics);
         try {
+            ensureConsumer();
             consumer.subscribe(topics, this.rebalanceListener);
             this.retryCounter = 0;
             while (!this.wakeUp) {
@@ -258,20 +322,48 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
         }
     }
 
+    /**
+     * This method will start an asynchronous Kafka the consumer that will run in background. The listened topics are
+     * the one in the configuration file.
+     *
+     * @param processor record(s) processor function to process every received records
+     * @return A CompletableFuture of the kafka consumer listener
+     */
     public Future<Void> listenAsync(P processor, ErrorProcessor<ConsumerRecord<K, V>> errorProcessor) {
         return CompletableFuture.runAsync(() -> listen(processor, errorProcessor));
     }
 
+    /**
+     * This method will start an asynchronous Kafka the consumer that will run in background. The listened topics are
+     * the one in the configuration file.
+     *
+     * @param processor record(s) processor function to process every received records
+     * @return A CompletableFuture of the kafka consumer listener
+     */
     public Future<Void> listenAsync(P processor) {
         return CompletableFuture.runAsync(() -> listen(processor));
     }
 
+    /**
+     * This method will start an asynchronous Kafka the consumer that will run in background. The listened topics are
+     * the one in topics parameter. (Topics list of the configuration file is ignored)
+     *
+     * @param topics list of topics to listen to
+     * @param processor record(s) processor function to process every received records
+     * @return A CompletableFuture of the kafka consumer listener
+     */
     public Future<Void> listenAsync(Collection<String> topics, P processor) {
         return CompletableFuture.runAsync(() -> listen(topics, processor, null));
     }
 
     // ---- Poll loop (common skeleton) ----
-
+    /**
+     * Poll loop skeleton. This method is called by the listen methods and contains the common logic for polling, error
+     * handling, and pause/resume. The actual processing of records is delegated to the {@link #processRecords} method
+     * implemented by subclasses.
+     *
+     * @param processor the processor to use for processing records
+     */
     private void pollAndConsume(P processor) {
         try {
             log.info("Polling for records ...");
@@ -336,6 +428,7 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
     protected void handleExceptionWithRetry(
             Exception e, ConsumerRecord<K, V> failedRecord, Runnable nonRetryableAction) {
         log.debug("Exception occurred, running error handler processing ...", e);
+        ensureConsumer();
         consumer.pause(consumer.assignment());
 
         RetryableConsumerConfiguration consumerConfig = this.kafkaRetryableConfiguration.getConsumer();
@@ -378,8 +471,10 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
     // ---- Public control methods ----
 
     public void stop() {
-        consumer.wakeup();
-        this.wakeUp = true;
+        if (consumer != null) {
+            consumer.wakeup();
+            this.wakeUp = true;
+        }
     }
 
     @SafeVarargs
