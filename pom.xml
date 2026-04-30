@@ -57,11 +57,11 @@
 
         <central-publishing-maven-plugin.version>0.8.0</central-publishing-maven-plugin.version>
         <commons-io.version>2.14.0</commons-io.version>
-        <commons-lang3.version>3.13.0</commons-lang3.version>
+        <commons-lang3.version>3.18.0</commons-lang3.version>
         <jacoco.version>0.8.8</jacoco.version>
         <junit.version>5.10.1</junit.version>
 
-        <kafka.apache.version>4.0.0</kafka.apache.version>
+        <kafka.apache.version>4.0.2</kafka.apache.version>
         <kafka.confluent.version>7.6.0</kafka.confluent.version>
         <kafka.stream.apache.version>4.0.0</kafka.stream.apache.version>
 
