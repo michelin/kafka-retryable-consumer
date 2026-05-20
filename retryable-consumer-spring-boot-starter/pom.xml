@@ -57,6 +57,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Spring Boot Web for health check endpoints -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Test utilities: add spring-boot-test for ApplicationContextRunner and other test helpers -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
