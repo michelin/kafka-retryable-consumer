@@ -48,13 +48,14 @@ kubernetes:
 ```
 
 Status codes:
-| State      | Readiness | Liveness |
-|------------|-----------|----------|
-| RUNNING    | 200       | 200      |
-| STARTING   | 204       | 200      |
-| ERROR      | 503       | 503      |
-| STOPPED    | 503       | 503      |
-| null       | 400       | 204      |
+
+| State    | Readiness | Liveness |
+|----------|-----------|----------|
+| RUNNING  | 200       | 200      |
+| STARTING | 204       | 200      |
+| ERROR    | 503       | 503      |
+| STOPPED  | 503       | 503      |
+| null     | 400       | 204      |
 
 ## Advanced Usage
 - Provide your own `KafkaRetryableConfiguration` bean for full control
