@@ -74,6 +74,9 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
     protected int retryCounter;
     protected boolean wakeUp;
 
+    @Getter
+    protected volatile ConsumerState consumerState = ConsumerState.STARTING;
+
     // ---- Constructors ----
 
     protected AbstractRetryableConsumer(String name) throws KafkaConfigurationException {
@@ -311,12 +314,17 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
             ensureConsumer();
             consumer.subscribe(topics, this.rebalanceListener);
             this.retryCounter = 0;
+            this.consumerState = ConsumerState.RUNNING;
             while (!this.wakeUp) {
                 this.pollAndConsume(processor);
             }
         } catch (WakeupException e) {
             log.info("Wake up signal received. Getting out of the while loop", e);
+        } catch (Exception e) {
+            this.consumerState = ConsumerState.ERROR;
+            throw e;
         } finally {
+            this.consumerState = ConsumerState.STOPPED;
             consumer.close();
             log.info("Consumer is closed");
         }
@@ -452,6 +460,7 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
             errorHandler.handleError(e, failedRecord);
 
             if (consumerConfig.getStopOnError()) {
+                this.consumerState = ConsumerState.ERROR;
                 log.error(
                         "Non-recoverable error occurred (Not retryable, or retry limit reached). Stopping consumer after 'stop-on-error' configuration...",
                         e);
@@ -474,6 +483,7 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
         if (consumer != null) {
             consumer.wakeup();
             this.wakeUp = true;
+            this.consumerState = ConsumerState.STOPPED;
         }
     }
 

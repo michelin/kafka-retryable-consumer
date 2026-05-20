@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src=".readme/logo-color.svg" alt="KafkaRertryableConsumer"/>
+<img src=".readme/logo-color.svg" alt="KafkaRetryableConsumer"/>
 
 # Kafka Retryable Consumer
 
@@ -19,45 +19,122 @@ This lib is proposed to ease the usage of kafka for simple data consumer with ex
 </div>
 
 ## Table of Contents
-* [Features](#features)
-    * [Current version](#current-version)
-    * [To be implemented](#to-be-implemented)
-* [Getting Started](#getting-started)
-    * [Vanilla Java](#vanilla-java)
-    * [Springboot](#springboot)
-* [Configuration](#configuration)
-* [Customisation](#customization)
-    * [Dead Letter Queue (DLQ)](#dead-letter-queue-dlq)
-    * [Custom Error Processing](#custom-error-processing)
-* [Code References](#code-references)
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [Health Checks](#health-checks)
+- [Configuration](#configuration)
+- [Customization](#customization)
+- [Contribution & Development](#contribution--development)
+- [License](#license)
 
 ## Features
-### Current version
 - Error management with Dead Letter Queue
 - Automatic record commit management in case of error or partition rebalance
 - Retry on error with Exception exclusion management
 - Custom Error processing
 - Batch Record Processing
+- **Kubernetes-style health check endpoints** (core & Spring Boot)
 
-### To be implemented
-- Health checks in core library for non springboot projects
+## Getting Started
+This repository hosts libraries for building robust Kafka consumers with retry and health check support.
+- **retryable-consumer-core**: Core library for Java
+- **retryable-consumer-spring-boot-starter**: Spring Boot autoconfiguration
 
-## Getting started
-Kafka consumer libs repository hosts various libraries that might be usefull for your Kafka project.
-- retryable-consumer-core : Core library for easy retryable consumers implementation
-- retryable-consumer-springboot-starter : Spring Boot autoconfiguration for the Retryable Consumer core library
-### Vanilla Java
-
-Insert retryable-consumer-core dependency in your POM :
-```xml  
-<dependency>  
-    <groupId>com.michelin.kafka</groupId>    
-    <artifactId>retryable-consumer-core</artifactId>    
+### Vanilla Java Example
+Add to your POM:
+```xml
+<dependency>
+    <groupId>com.michelin.kafka</groupId>
+    <artifactId>retryable-consumer-core</artifactId>
     <version>${retryable-consumer-core.version}</version>
-</dependency>  
-```  
+</dependency>
+```
 
-Then in your code, on a retryable consumer just call ```java listen(topics)``` method :
+Basic usage:
+```java
+try(RetryableConsumer<String, String> retryableConsumer = new RetryableConsumer<>()) {
+    retryableConsumer.listen(
+        Collections.singleton("MY_TOPIC"),
+        businessProcessor::processRecord
+    );
+}
+```
+
+### Spring Boot Example
+Add the starter:
+```xml
+<dependency>
+  <groupId>com.michelin.kafka</groupId>
+  <artifactId>retryable-consumer-spring-boot-starter</artifactId>
+  <version>${retryable-consumer-core.version}</version>
+</dependency>
+```
+
+Minimal `application.yml`:
+```yaml
+kafka:
+  retryable:
+    enabled: true
+    consumer:
+      topics:
+        - my-topic
+      properties:
+        bootstrap.servers: 127.0.0.1:9092
+        key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+```
+
+Inject and use:
+```java
+@Autowired
+private RetryableConsumer<String, String> retryableConsumer;
+```
+
+## Health Checks
+
+Both core and Spring Boot modules expose **Kubernetes-style health endpoints** for readiness and liveness probes.
+
+- **Spring Boot**: Endpoints are available if `spring-boot-starter-web` is present.
+    - `GET /ready` (readiness)
+    - `GET /liveness` (liveness)
+    - Paths configurable via `kubernetes.readiness.path` and `kubernetes.liveness.path`
+- **Core**: Use `KubernetesService` to get readiness/liveness status codes for embedding in your own HTTP server.
+
+| State      | Readiness | Liveness |
+|------------|-----------|----------|
+| RUNNING    | 200       | 200      |
+| STARTING   | 204       | 200      |
+| ERROR      | 503       | 503      |
+| STOPPED    | 503       | 503      |
+| null       | 400       | 204      |
+
+## Configuration
+See [Spring Boot README](retryable-consumer-spring-boot-starter/README.md) for full property reference.
+
+## Customization
+- **Dead Letter Queue (DLQ)**: Optional, configure `kafka.retryable.dead-letter.producer.topic` and properties.
+- **Custom Error Processing**: Implement `ErrorProcessor` and inject into your consumer.
+
+## Contribution & Development
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+- Run all tests:
+```bash
+mvn clean test
+```
+- Format code:
+```bash
+mvn spotless:apply
+```
+
+## License
+
+This project is licensed under the [Apache 2.0 License](LICENSE).
+
+---
+
+Original inspiration: [kstreamplify](https://github.com/michelin/kstreamplify)
+
 ```java  
 try(RetryableConsumer<String, String> retryableConsumer = new RetryableConsumer<>()) {
     retryableConsumer.listen(
