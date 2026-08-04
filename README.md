@@ -183,7 +183,7 @@ Configuration prefix: `kafka.retryable.dead-letter.producer`
 
 The library tracks consumer lifecycle state (`STARTING` -> `RUNNING` -> `ERROR` / `STOPPED`) and exposes Kubernetes-compatible health endpoints.
 
-**Spring Boot** — If `spring-boot-starter-web` is on the classpath, endpoints are auto-configured:
+**Spring Boot** — If `spring-boot-starter-web` is on the classpath, endpoints are autoconfigured:
 - `GET /{kubernetes.readiness.path}` (default: `/ready`)
 - `GET /{kubernetes.liveness.path}` (default: `/liveness`)
 
