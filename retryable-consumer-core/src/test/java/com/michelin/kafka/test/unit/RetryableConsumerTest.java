@@ -310,7 +310,7 @@ class RetryableConsumerTest {
     @Test
     @Order(6)
     void testRetryableWithCustomErrorProcessor() throws Exception {
-        CustomErrorProcessor customErrorProcessor = new CustomErrorProcessor();
+        CustomErrorProcessor customErrorProcessor = spy(new CustomErrorProcessor());
         ConsumerRecord<String, String> record1 =
                 new ConsumerRecord<>(topic, record1Partition, record1Offset, "key1", "value1");
         ConsumerRecord<String, String> record2 =
@@ -340,6 +340,7 @@ class RetryableConsumerTest {
 
             retryableConsumerCustomError.listenAsync(r -> recordProcessorNoError.processRecord(r));
             verify(kafkaConsumer, timeout(5000).atLeastOnce()).poll(any());
+            verify(customErrorProcessor, timeout(5000).times(1)).processError(any(), any(), any());
 
             assertEquals(1, customErrorProcessor.getErrors().size());
             assertEquals(
