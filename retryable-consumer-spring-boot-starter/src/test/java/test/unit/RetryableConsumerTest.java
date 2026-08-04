@@ -44,6 +44,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.record.TimestampType;
 import org.junit.jupiter.api.*;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -339,12 +340,10 @@ class RetryableConsumerTest {
 
             retryableConsumerCustomError.listenAsync(r -> recordProcessorNoError.processRecord(r));
             verify(kafkaConsumer, timeout(5000).atLeastOnce()).poll(any());
-            verify(customErrorProcessor, timeout(5000).times(1)).processError(any(), any(), any());
-
-            assertEquals(1, customErrorProcessor.getErrors().size());
+            ArgumentCaptor<Throwable> throwableCaptor = ArgumentCaptor.forClass(Throwable.class);
+            verify(customErrorProcessor, timeout(5000).times(1)).processError(throwableCaptor.capture(), any(), any());
             assertEquals(
-                    "Test Custom Error Processor",
-                    customErrorProcessor.getErrors().get(0));
+                    "Test Custom Error Processor", throwableCaptor.getValue().getMessage());
         }
     }
 
