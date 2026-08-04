@@ -21,9 +21,11 @@ package com.michelin.kafka.autoconfigure;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.configuration.DeadLetterProducerConfiguration;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
+import com.michelin.kafka.controller.KubernetesController;
 import com.michelin.kafka.error.DeadLetterProducer;
 import com.michelin.kafka.mapper.KafkaRetryableConfigurationMapper;
 import com.michelin.kafka.properties.KafkaRetryableSpringProperties;
+import com.michelin.kafka.service.KubernetesService;
 import java.util.Properties;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -31,14 +33,17 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.lang.Nullable;
 
 @AutoConfiguration
 @EnableConfigurationProperties(KafkaRetryableSpringProperties.class)
 @ConditionalOnProperty(prefix = "kafka.retryable", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ComponentScan(basePackageClasses = KubernetesController.class)
 public class KafkaRetryableAutoConfiguration {
 
     @Bean
@@ -89,6 +94,13 @@ public class KafkaRetryableAutoConfiguration {
             return new RetryableConsumer<>(configuration, deadLetterProducer);
         }
         return new RetryableConsumer<>(configuration);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(KubernetesService.class)
+    @ConditionalOnWebApplication
+    public KubernetesService kubernetesService(RetryableConsumer<?, ?> retryableConsumer) {
+        return new KubernetesService(retryableConsumer);
     }
 
     private static Properties getConsumerProps(KafkaRetryableConfiguration configuration) {
