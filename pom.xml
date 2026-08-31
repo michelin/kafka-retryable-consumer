@@ -77,6 +77,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <slf4j.version>2.0.9</slf4j.version>
         <snakeyaml.version>2.0</snakeyaml.version>
+        <sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <sonar.organization>michelin</sonar.organization>
         <sonar.projectKey>michelin_kafka-retryable-consumer</sonar.projectKey>
@@ -314,6 +315,19 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+
+            <!--
+                Declared with no execution: the CI invokes it explicitly through "mvn sonar:sonar". The declaration is
+                required nonetheless, because the "sonar" prefix cannot be resolved otherwise: Maven only searches the
+                org.apache.maven.plugins and org.codehaus.mojo groups, whereas the scanner lives in
+                org.sonarsource.scanner.maven. Declaring it here also pins the version instead of silently picking the
+                latest release available.
+            -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>${sonar-maven-plugin.version}</version>
             </plugin>
 
             <plugin>
