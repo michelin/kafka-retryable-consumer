@@ -272,6 +272,14 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <!--
+                        Budget given to the forked JVM to exit once the tests are over. The default is 30s, which a
+                        slow CI runner can exceed while the embedded Kafka broker releases its resources: Surefire
+                        then kills the fork and fails the build even though every test passed.
+                    -->
+                    <forkedProcessExitTimeoutInSeconds>300</forkedProcessExitTimeoutInSeconds>
+                </configuration>
             </plugin>
 
             <plugin>

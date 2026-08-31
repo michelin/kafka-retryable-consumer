@@ -53,6 +53,9 @@ import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.integration.utils.EmbeddedKafkaCluster;
+import org.junit.jupiter.api.extension.BeforeAllCallback;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.extension.ExtensionContext;
 
 /**
  * Base class for Kafka integration tests.
@@ -62,6 +65,7 @@ import org.apache.kafka.streams.integration.utils.EmbeddedKafkaCluster;
  * never rely on arbitrary sleeps or on a shared mutable configuration.
  */
 @Slf4j
+@ExtendWith(AbstractKafkaIntegrationTest.EmbeddedKafkaClusterExtension.class)
 public abstract class AbstractKafkaIntegrationTest {
 
     /** Scope of the mocked Confluent schema registry shared by the dead letter producer and the test consumers. */
@@ -73,31 +77,77 @@ public abstract class AbstractKafkaIntegrationTest {
      */
     protected static final Duration CLUSTER_OPERATION_TIMEOUT = Duration.ofSeconds(60);
 
+    /** Key under which the cluster is memoized in the JUnit root store, hence once for the whole JVM. */
+    private static final String CLUSTER_STORE_KEY = "embedded-kafka-cluster";
+
+    private static volatile EmbeddedKafkaCluster kafkaCluster;
+
+    private static EmbeddedKafkaCluster cluster() {
+        EmbeddedKafkaCluster current = kafkaCluster;
+        if (current == null) {
+            throw new IllegalStateException("Embedded kafka cluster has not been started");
+        }
+        return current;
+    }
+
     /**
-     * The in memory Kafka cluster. Started once per JVM and stopped by a shutdown hook: starting it inside a
-     * {@code @BeforeAll} would make it subject to the JUnit timeouts of the test class and would restart a broker for
-     * every test class.
+     * Starts the shared cluster on the first integration test class and closes it at the end of the whole test plan.
+     *
+     * <p>The cluster is deliberately not started in a {@code @BeforeAll} (it would be subject to the JUnit timeouts of
+     * the test class and would restart a broker for every class) nor stopped from a JVM shutdown hook: shutdown hooks
+     * run after Surefire has been told the tests are over, inside the {@code forkedProcessExitTimeoutInSeconds} budget
+     * (30s by default). Stopping a broker can exceed it on a slow CI runner, in which case Surefire kills the fork and
+     * fails the build even though every test passed. Closing the resource from the JUnit lifecycle keeps the shutdown
+     * inside the part of the run Surefire actually waits for.
      */
-    private static final EmbeddedKafkaCluster KAFKA_CLUSTER;
+    static class EmbeddedKafkaClusterExtension implements BeforeAllCallback {
 
-    static {
-        Properties brokerConfig = new Properties();
-        // Internal topics must be creatable on a single broker
-        brokerConfig.put("offsets.topic.replication.factor", "1");
-        brokerConfig.put("transaction.state.log.replication.factor", "1");
-        brokerConfig.put("transaction.state.log.min.isr", "1");
-        // The default 50 partitions of __consumer_offsets are pure overhead for a single broker test cluster
-        brokerConfig.put("offsets.topic.num.partitions", "1");
-        // Do not delay the first rebalance of a brand new consumer group
-        brokerConfig.put("group.initial.rebalance.delay.ms", "0");
-        // Every topic used by the tests is created explicitly
-        brokerConfig.put("auto.create.topics.enable", "false");
+        @Override
+        public void beforeAll(ExtensionContext context) {
+            context.getRoot()
+                    .getStore(ExtensionContext.Namespace.GLOBAL)
+                    .getOrComputeIfAbsent(CLUSTER_STORE_KEY, key -> new ClusterResource(), ClusterResource.class);
+        }
+    }
 
-        KAFKA_CLUSTER = new EmbeddedKafkaCluster(1, brokerConfig);
-        KAFKA_CLUSTER.start();
-        KAFKA_CLUSTER.verifyClusterReadiness();
-        Runtime.getRuntime().addShutdownHook(new Thread(KAFKA_CLUSTER::stop, "embedded-kafka-shutdown"));
-        log.info("Embedded kafka cluster started on {}", KAFKA_CLUSTER.bootstrapServers());
+    /** Holder closed by JUnit once every test class has run. */
+    static class ClusterResource implements ExtensionContext.Store.CloseableResource {
+
+        ClusterResource() {
+            Properties brokerConfig = new Properties();
+            // Internal topics must be creatable on a single broker
+            brokerConfig.put("offsets.topic.replication.factor", "1");
+            brokerConfig.put("transaction.state.log.replication.factor", "1");
+            brokerConfig.put("transaction.state.log.min.isr", "1");
+            // The default 50 partitions of __consumer_offsets are pure overhead for a single broker test cluster
+            brokerConfig.put("offsets.topic.num.partitions", "1");
+            // Do not delay the first rebalance of a brand new consumer group
+            brokerConfig.put("group.initial.rebalance.delay.ms", "0");
+            // Every topic used by the tests is created explicitly
+            brokerConfig.put("auto.create.topics.enable", "false");
+
+            EmbeddedKafkaCluster started = new EmbeddedKafkaCluster(1, brokerConfig);
+            started.start();
+            started.verifyClusterReadiness();
+            kafkaCluster = started;
+            log.info("Embedded kafka cluster started on {}", started.bootstrapServers());
+        }
+
+        @Override
+        public void close() {
+            EmbeddedKafkaCluster current = kafkaCluster;
+            if (current == null) {
+                return;
+            }
+            kafkaCluster = null;
+            try {
+                current.stop();
+                log.info("Embedded kafka cluster stopped");
+            } catch (Exception e) {
+                // Never fail a green build on a teardown glitch: the JVM is about to exit anyway
+                log.warn("Ignoring error raised while stopping the embedded kafka cluster", e);
+            }
+        }
     }
 
     /**
@@ -118,7 +168,7 @@ public abstract class AbstractKafkaIntegrationTest {
      * @param partitions the number of partitions
      */
     protected static void createTopic(String topic, int partitions) {
-        try (Admin admin = KAFKA_CLUSTER.createAdminClient()) {
+        try (Admin admin = cluster().createAdminClient()) {
             admin.createTopics(Collections.singletonList(new NewTopic(topic, partitions, (short) 1)))
                     .all()
                     .get(CLUSTER_OPERATION_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
@@ -164,7 +214,7 @@ public abstract class AbstractKafkaIntegrationTest {
      */
     protected static void produceStringRecords(String topic, int count) {
         Properties producerConfig = new Properties();
-        producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_CLUSTER.bootstrapServers());
+        producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, cluster().bootstrapServers());
         producerConfig.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         producerConfig.put(ProducerConfig.ACKS_CONFIG, "all");
@@ -190,7 +240,8 @@ public abstract class AbstractKafkaIntegrationTest {
         KafkaRetryableConfiguration configuration = new KafkaRetryableConfiguration();
 
         Properties consumerProperties = configuration.getConsumer().getProperties();
-        consumerProperties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_CLUSTER.bootstrapServers());
+        consumerProperties.put(
+                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, cluster().bootstrapServers());
         consumerProperties.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, SCHEMA_REGISTRY_URL);
         consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, uniqueName("group-" + dataTopic));
         consumerProperties.put(ConsumerConfig.CLIENT_ID_CONFIG, uniqueName("client-" + dataTopic));
@@ -208,7 +259,8 @@ public abstract class AbstractKafkaIntegrationTest {
         configuration.getConsumer().setTopics(Collections.singletonList(dataTopic));
 
         Properties deadLetterProperties = configuration.getDeadLetter().getProperties();
-        deadLetterProperties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_CLUSTER.bootstrapServers());
+        deadLetterProperties.put(
+                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, cluster().bootstrapServers());
         deadLetterProperties.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, SCHEMA_REGISTRY_URL);
         deadLetterProperties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         deadLetterProperties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class.getName());
@@ -268,7 +320,7 @@ public abstract class AbstractKafkaIntegrationTest {
      * @return the number of records held by the topic
      */
     protected static long countRecords(String topic) {
-        try (Admin admin = KAFKA_CLUSTER.createAdminClient()) {
+        try (Admin admin = cluster().createAdminClient()) {
             TopicDescription description = admin.describeTopics(Collections.singletonList(topic))
                     .allTopicNames()
                     .get(CLUSTER_OPERATION_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
@@ -307,7 +359,7 @@ public abstract class AbstractKafkaIntegrationTest {
 
     private static Properties deadLetterConsumerConfig() {
         Properties config = new Properties();
-        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_CLUSTER.bootstrapServers());
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, cluster().bootstrapServers());
         config.put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, SCHEMA_REGISTRY_URL);
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaAvroDeserializer.class.getName());
