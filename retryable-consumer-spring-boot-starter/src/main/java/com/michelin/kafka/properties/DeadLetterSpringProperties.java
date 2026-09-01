@@ -19,15 +19,15 @@
 package com.michelin.kafka.properties;
 
 import lombok.Data;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * Dead letter configuration.
+ *
+ * <p>The {@code producer} nesting level mirrors the YAML layout used by the standalone configuration of the core
+ * library, so that both bind the same {@code kafka.retryable.dead-letter.producer.*} keys.
+ */
 @Data
-@ConfigurationProperties(prefix = "kafka.retryable")
-public class KafkaRetryableSpringProperties {
+public class DeadLetterSpringProperties {
 
-    private boolean enabled = true;
-
-    private ConsumerSpringProperties consumer = new ConsumerSpringProperties();
-
-    private DeadLetterSpringProperties deadLetter = new DeadLetterSpringProperties();
+    private DeadLetterProducerSpringProperties producer = new DeadLetterProducerSpringProperties();
 }

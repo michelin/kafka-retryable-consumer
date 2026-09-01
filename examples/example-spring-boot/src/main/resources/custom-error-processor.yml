@@ -1,0 +1,32 @@
+# Configuration of CustomErrorProcessorConfiguration, selected by spring.config.name=custom-error-processor.
+# Nothing is ever written to the dead letter topic here: the custom error processor replaces it entirely.
+# The dead letter properties are still required, the consumer always builds a producer from them.
+# Beware: the starter binds flat, kebab-case keys, unlike the nested form used by the core module.
+kafka:
+  retryable:
+    consumer:
+      topics: spring-custom-error-processor
+      retry-max: 1 # A single retry, so the error processor is reached quickly
+      properties: # Plain Kafka consumer properties
+        bootstrap.servers: localhost:9092
+        group.id: spring-custom-error-processor
+        auto.offset.reset: earliest
+        enable.auto.commit: false # The library commits offsets itself, once the processing succeeded
+        # The starter injects these two as a fallback, but only for the consumer it builds itself.
+        # Declaring them explicitly is what makes a hand written consumer bean work as well.
+        key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    dead-letter:
+      producer:
+        topic: spring-custom-error-processor-dlt
+        properties:
+          bootstrap.servers: localhost:9092
+          # The dead letter payload is an Avro record. The starter falls back on a string serializer, which cannot
+          # encode it, so both properties below are required for the dead letter topic to actually work.
+          schema.registry.url: http://localhost:8081
+          key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+
+logging:
+  level:
+    com.michelin.kafka: INFO

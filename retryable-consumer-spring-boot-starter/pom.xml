@@ -69,18 +69,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Test utilities: add spring-boot-test for ApplicationContextRunner and other test helpers -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-        </dependency>
-
     </dependencies>
 
 </project>

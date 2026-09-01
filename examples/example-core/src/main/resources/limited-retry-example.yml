@@ -1,0 +1,40 @@
+# Configuration of LimitedRetryToDeadLetterExample.
+# A bounded retry budget: once it is exhausted the record goes to the dead letter topic.
+kafka:
+  retryable:
+    name: limited-retry-example
+    consumer:
+      topics: limited-retry-example
+      retry:
+        max: 2 # The initial attempt plus two retries, then the record is given up on
+        backoff:
+          ms: 100 # Wait between two attempts instead of hammering the downstream system
+      properties: # Plain Kafka consumer properties
+        bootstrap:
+          servers: localhost:9092
+        group:
+          id: limited-retry-example
+        auto:
+          offset:
+            reset: earliest
+        enable:
+          auto:
+            commit: false # The library commits offsets itself, once the processing succeeded
+        key:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    dead-letter:
+      producer:
+        topic: limited-retry-example-dlt
+        properties:
+          bootstrap:
+            servers: localhost:9092
+          # The dead letter payload is an Avro record, hence the registry and the Avro serializer
+          schema:
+            registry:
+              url: http://localhost:8081
+          key:
+            serializer: org.apache.kafka.common.serialization.StringSerializer
+          value:
+            serializer: io.confluent.kafka.serializers.KafkaAvroSerializer

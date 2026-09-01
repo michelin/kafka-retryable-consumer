@@ -51,23 +51,7 @@ public class KafkaRetryableAutoConfiguration {
     @Lazy
     @ConditionalOnProperty(prefix = "kafka.retryable.dead-letter.producer", name = "topic")
     public DeadLetterProducer deadLetterProducer(KafkaRetryableConfiguration configuration) {
-        // Validate DLQ props
-        DeadLetterProducerConfiguration dl = configuration.getDeadLetter();
-        if (dl == null) {
-            throw new IllegalStateException("Missing dead-letter.producer configuration");
-        }
-        Properties dlProps = dl.getProperties();
-        String dlBootstrap = (String) dlProps.get(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG);
-        if (dlBootstrap == null || dlBootstrap.isBlank()) {
-            throw new IllegalStateException(
-                    "Missing required property: kafka.retryable.dead-letter.producer.properties.bootstrap.servers must be configured");
-        }
-        // Provide default serializers if missing
-        dlProps.putIfAbsent("key.serializer", StringSerializer.class.getName());
-        dlProps.putIfAbsent("value.serializer", StringSerializer.class.getName());
-        dl.setProperties(dlProps);
-
-        return new DeadLetterProducer(configuration.getDeadLetter());
+        return new DeadLetterProducer(validatedDeadLetterConfiguration(configuration));
     }
 
     @Bean
@@ -88,7 +72,40 @@ public class KafkaRetryableAutoConfiguration {
         if (deadLetterProducer != null) {
             return new RetryableConsumer<>(configuration, deadLetterProducer);
         }
+        // No dedicated bean: the consumer builds its own dead-letter producer from the configuration, so the
+        // dead-letter properties must be validated here too, otherwise the failure surfaces as an obscure
+        // Kafka ConfigException about a missing serializer.
+        validatedDeadLetterConfiguration(configuration);
         return new RetryableConsumer<>(configuration);
+    }
+
+    /**
+     * Validates the dead-letter properties and applies the default serializers.
+     *
+     * <p>A dead-letter producer is always built by the consumer, so these properties are required even when no
+     * dead-letter topic is configured.
+     *
+     * @return the validated dead-letter configuration
+     * @throws IllegalStateException if the dead-letter bootstrap servers are missing
+     */
+    private static DeadLetterProducerConfiguration validatedDeadLetterConfiguration(
+            KafkaRetryableConfiguration configuration) {
+        DeadLetterProducerConfiguration deadLetter = configuration.getDeadLetter();
+        if (deadLetter == null) {
+            throw new IllegalStateException("Missing required configuration: kafka.retryable.dead-letter.producer");
+        }
+
+        Properties deadLetterProps = deadLetter.getProperties();
+        String bootstrap = (String) deadLetterProps.get(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG);
+        if (bootstrap == null || bootstrap.isBlank()) {
+            throw new IllegalStateException(
+                    "Missing required property: kafka.retryable.dead-letter.producer.properties.bootstrap.servers must be configured");
+        }
+
+        deadLetterProps.putIfAbsent("key.serializer", StringSerializer.class.getName());
+        deadLetterProps.putIfAbsent("value.serializer", StringSerializer.class.getName());
+        deadLetter.setProperties(deadLetterProps);
+        return deadLetter;
     }
 
     private static Properties getConsumerProps(KafkaRetryableConfiguration configuration) {

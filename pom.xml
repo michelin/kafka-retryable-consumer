@@ -41,6 +41,7 @@
     </developers>
 
     <modules>
+        <module>examples</module>
         <module>retryable-consumer-core</module>
         <module>retryable-consumer-spring-boot-starter</module>
     </modules>

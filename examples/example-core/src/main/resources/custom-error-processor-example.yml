@@ -1,0 +1,39 @@
+# Configuration of CustomErrorProcessorExample.
+# Note that no dead letter topic is declared: the custom error processor replaces it entirely.
+# The dead letter properties are still required, the consumer always builds a producer from them.
+kafka:
+  retryable:
+    name: custom-error-processor-example
+    consumer:
+      topics: custom-error-processor-example
+      retry:
+        max: 1
+      properties: # Plain Kafka consumer properties
+        bootstrap:
+          servers: localhost:9092
+        group:
+          id: custom-error-processor-example
+        auto:
+          offset:
+            reset: earliest
+        enable:
+          auto:
+            commit: false # The library commits offsets itself, once the processing succeeded
+        key:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    dead-letter:
+      producer:
+        topic: custom-error-processor-example-dlt
+        properties:
+          bootstrap:
+            servers: localhost:9092
+          # The dead letter payload is an Avro record, hence the registry and the Avro serializer
+          schema:
+            registry:
+              url: http://localhost:8081
+          key:
+            serializer: org.apache.kafka.common.serialization.StringSerializer
+          value:
+            serializer: io.confluent.kafka.serializers.KafkaAvroSerializer

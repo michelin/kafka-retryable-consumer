@@ -1,0 +1,32 @@
+# Configuration of StopOnErrorRunner, selected by spring.config.name=stop-on-error.
+# The whole point of this example is a single property, and it needs no Java code at all.
+# Beware: the starter binds flat, kebab-case keys, unlike the nested form used by the core module.
+kafka:
+  retryable:
+    consumer:
+      topics: spring-stop-on-error
+      stop-on-error: true # The offset of the failed record stays uncommitted, a restart replays it
+      retry-max: 1 # A single retry, so the example does not linger before demonstrating the stop
+      properties: # Plain Kafka consumer properties
+        bootstrap.servers: localhost:9092
+        group.id: spring-stop-on-error
+        auto.offset.reset: earliest
+        enable.auto.commit: false # The library commits offsets itself, once the processing succeeded
+        # The starter injects these two as a fallback, but only for the consumer it builds itself.
+        # Declaring them explicitly is what makes a hand written consumer bean work as well.
+        key.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value.deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    dead-letter:
+      producer:
+        topic: spring-stop-on-error-dlt
+        properties:
+          bootstrap.servers: localhost:9092
+          # The dead letter payload is an Avro record. The starter falls back on a string serializer, which cannot
+          # encode it, so both properties below are required for the dead letter topic to actually work.
+          schema.registry.url: http://localhost:8081
+          key.serializer: org.apache.kafka.common.serialization.StringSerializer
+          value.serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+
+logging:
+  level:
+    com.michelin.kafka: INFO

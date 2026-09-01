@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.michelin.kafka</groupId>
+        <artifactId>kafka-retryable-consumer</artifactId>
+        <version>1.2.4-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>kafka-retryable-consumer-examples</artifactId>
+    <packaging>pom</packaging>
+
+    <name>kafka-retryable-consumer-examples</name>
+    <description>Runnable examples used to exercise every capability of the library before a release.</description>
+
+    <modules>
+        <module>example-core</module>
+        <module>example-spring-boot</module>
+    </modules>
+
+    <properties>
+        <!--
+            The examples are documentation and a release validation harness: they must never be published.
+            Both flags are required, one for the Maven deploy phase and one for the Central publishing plugin
+            inherited from the root pom.
+        -->
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <maven.install.skip>true</maven.install.skip>
+    </properties>
+
+    <dependencies>
+
+        <!--
+            The examples reuse the integration test harness of the core module (embedded Kafka broker, mock schema
+            registry and topic helpers) instead of duplicating it. It is published as a test jar by the core module.
+        -->
+        <dependency>
+            <groupId>com.michelin.kafka</groupId>
+            <artifactId>retryable-consumer-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Embedded Kafka broker. These are the transitive test dependencies of the harness above: test scoped
+            dependencies are not inherited by consumers, so they have to be declared again here.
+        -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>${kafka.apache.version}</version>
+            <classifier>test</classifier>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-server-common</artifactId>
+            <version>${kafka.apache.version}</version>
+            <classifier>test</classifier>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-streams-integration-tests</artifactId>
+            <version>${kafka.stream.apache.version}</version>
+            <classifier>test</classifier>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-test-common-runtime</artifactId>
+            <version>${kafka.apache.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka_2.13</artifactId>
+            <version>${kafka.apache.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <configuration>
+                    <skipPublishing>true</skipPublishing>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
