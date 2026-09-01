@@ -29,5 +29,5 @@ public class KafkaRetryableSpringProperties {
 
     private ConsumerSpringProperties consumer = new ConsumerSpringProperties();
 
-    private DeadLetterProducerSpringProperties deadLetter = new DeadLetterProducerSpringProperties();
+    private DeadLetterSpringProperties deadLetter = new DeadLetterSpringProperties();
 }

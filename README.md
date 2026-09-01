@@ -217,7 +217,7 @@ Configuration key prefix`kafka.retryable.dead-letter.producer` :
 ## Customization
 ### Dead Letter Queue (DLQ)
 
-The DLQ is optional and will only be created if `kafka.retryable.dead-letter.producer.topic` is configured. If configured, the DLQ producer requires producer properties including `bootstrap.servers` and serializers.
+The consumer always builds a dead-letter producer, so `kafka.retryable.dead-letter.producer.properties.bootstrap.servers` is **required**. A dedicated `DeadLetterProducer` bean is exposed only when `kafka.retryable.dead-letter.producer.topic` is also configured.
 
 Example DLQ config:
 

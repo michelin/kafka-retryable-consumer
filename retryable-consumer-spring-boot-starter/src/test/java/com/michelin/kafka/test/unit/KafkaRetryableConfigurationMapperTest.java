@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package test.unit;
+package com.michelin.kafka.test.unit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -55,7 +55,7 @@ class KafkaRetryableConfigurationMapperTest {
         Properties p = new Properties();
         p.put("bootstrap.servers", "localhost:9092");
         dl.setProperties(p);
-        props.setDeadLetter(dl);
+        props.getDeadLetter().setProducer(dl);
 
         KafkaRetryableConfiguration config = KafkaRetryableConfigurationMapper.map(props);
 

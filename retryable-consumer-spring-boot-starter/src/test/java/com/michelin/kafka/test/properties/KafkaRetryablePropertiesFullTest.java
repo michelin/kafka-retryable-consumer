@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package test.properties;
+package com.michelin.kafka.test.properties;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -40,7 +40,7 @@ class KafkaRetryablePropertiesFullTest {
 
         DeadLetterProducerSpringProperties dl = new DeadLetterProducerSpringProperties();
         dl.setTopic("DL_TOPIC");
-        props.setDeadLetter(dl);
+        props.getDeadLetter().setProducer(dl);
 
         KafkaRetryableConfiguration config = KafkaRetryableConfigurationMapper.map(props);
 

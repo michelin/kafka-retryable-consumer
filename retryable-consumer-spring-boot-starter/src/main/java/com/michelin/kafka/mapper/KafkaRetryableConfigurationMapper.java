@@ -36,8 +36,8 @@ public final class KafkaRetryableConfigurationMapper {
 
         // ---- Dead letter ----
         DeadLetterProducerConfiguration dlq = new DeadLetterProducerConfiguration();
-        dlq.setTopic(props.getDeadLetter().getTopic());
-        dlq.setProperties(props.getDeadLetter().getProperties());
+        dlq.setTopic(props.getDeadLetter().getProducer().getTopic());
+        dlq.setProperties(props.getDeadLetter().getProducer().getProperties());
 
         config.setConsumer(consumer);
         config.setDeadLetter(dlq);

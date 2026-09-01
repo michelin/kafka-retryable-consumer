@@ -98,6 +98,23 @@
                 <groupId>org.apache.avro</groupId>
                 <artifactId>avro-maven-plugin</artifactId>
             </plugin>
+
+            <!--
+                The example modules reuse the integration test harness of this module (embedded Kafka broker, mock
+                schema registry and topic helpers) rather than duplicating it, so the test classes are packaged.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>test-jar</id>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>
