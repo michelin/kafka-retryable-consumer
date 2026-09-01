@@ -37,9 +37,9 @@ class CustomErrorProcessorConfigurationIntegrationTest extends AbstractSpringExa
 
         try (ConfigurableApplicationContext context = startExample(
                 CustomErrorProcessorConfiguration.class,
+                CustomErrorProcessorConfiguration.CONFIG_NAME,
                 topic,
-                deadLetterTopic,
-                "--kafka.retryable.consumer.retry-max=1")) {
+                deadLetterTopic)) {
 
             CustomErrorProcessorConfiguration example = context.getBean(CustomErrorProcessorConfiguration.class);
             produceStringRecords(topic, 1);

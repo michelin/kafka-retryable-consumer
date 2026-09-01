@@ -21,8 +21,8 @@ package com.michelin.kafka.example.core;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
+import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +36,8 @@ class CustomErrorProcessorExampleIntegrationTest extends AbstractExampleIntegrat
         createTopic(topic, 1);
         createTopic(deadLetterTopic, 1);
 
-        KafkaRetryableConfiguration configuration = loadExampleConfiguration(CustomErrorProcessorExample.CONFIG_FILE, topic, deadLetterTopic);
+        KafkaRetryableConfiguration configuration =
+                loadExampleConfiguration(CustomErrorProcessorExample.CONFIG_FILE, topic, deadLetterTopic);
 
         try (CustomErrorProcessorExample example = new CustomErrorProcessorExample(configuration)) {
             example.start();

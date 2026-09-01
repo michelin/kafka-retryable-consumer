@@ -21,8 +21,8 @@ package com.michelin.kafka.example.core;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
+import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -37,7 +37,8 @@ class SimpleConsumerExampleIntegrationTest extends AbstractExampleIntegrationTes
         createTopic(topic, 1);
         createTopic(deadLetterTopic, 1);
 
-        KafkaRetryableConfiguration configuration = loadExampleConfiguration(SimpleConsumerExample.CONFIG_FILE, topic, deadLetterTopic);
+        KafkaRetryableConfiguration configuration =
+                loadExampleConfiguration(SimpleConsumerExample.CONFIG_FILE, topic, deadLetterTopic);
 
         try (SimpleConsumerExample example = new SimpleConsumerExample(configuration)) {
             example.start();

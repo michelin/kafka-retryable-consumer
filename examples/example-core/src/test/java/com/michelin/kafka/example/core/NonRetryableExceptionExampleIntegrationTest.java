@@ -20,8 +20,8 @@ package com.michelin.kafka.example.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
+import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import org.junit.jupiter.api.Test;
 
 /** Runs {@link NonRetryableExceptionExample} against an embedded broker. */
@@ -34,7 +34,8 @@ class NonRetryableExceptionExampleIntegrationTest extends AbstractExampleIntegra
         createTopic(topic, 1);
         createTopic(deadLetterTopic, 1);
 
-        KafkaRetryableConfiguration configuration = loadExampleConfiguration(NonRetryableExceptionExample.CONFIG_FILE, topic, deadLetterTopic);
+        KafkaRetryableConfiguration configuration =
+                loadExampleConfiguration(NonRetryableExceptionExample.CONFIG_FILE, topic, deadLetterTopic);
 
         try (NonRetryableExceptionExample example = new NonRetryableExceptionExample(configuration)) {
             example.start();

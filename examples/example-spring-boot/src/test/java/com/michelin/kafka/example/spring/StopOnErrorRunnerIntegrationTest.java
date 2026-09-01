@@ -35,12 +35,8 @@ class StopOnErrorRunnerIntegrationTest extends AbstractSpringExampleIntegrationT
         createTopic(topic, 1);
         createTopic(deadLetterTopic, 1);
 
-        try (ConfigurableApplicationContext context = startExample(
-                StopOnErrorRunner.class,
-                topic,
-                deadLetterTopic,
-                "--kafka.retryable.consumer.stop-on-error=true",
-                "--kafka.retryable.consumer.retry-max=1")) {
+        try (ConfigurableApplicationContext context =
+                startExample(StopOnErrorRunner.class, StopOnErrorRunner.CONFIG_NAME, topic, deadLetterTopic)) {
 
             StopOnErrorRunner runner = context.getBean(StopOnErrorRunner.class);
             produceStringRecords(topic, 1);

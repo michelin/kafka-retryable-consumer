@@ -53,7 +53,8 @@ class DefaultConfigurationFileExampleTest {
                 "localhost:9092", configuration.getConsumer().getProperties().get("bootstrap.servers"));
 
         assertEquals(
-                "default-configuration-example-dlt", configuration.getDeadLetter().getTopic());
+                "default-configuration-example-dlt",
+                configuration.getDeadLetter().getTopic());
         assertTrue(configuration.getDeadLetter().getProperties().containsKey("schema.registry.url"));
     }
 }

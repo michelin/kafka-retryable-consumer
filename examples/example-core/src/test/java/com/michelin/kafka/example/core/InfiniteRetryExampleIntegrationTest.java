@@ -21,8 +21,8 @@ package com.michelin.kafka.example.core;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
+import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -37,7 +37,8 @@ class InfiniteRetryExampleIntegrationTest extends AbstractExampleIntegrationTest
         createTopic(topic, 1);
         createTopic(deadLetterTopic, 1);
 
-        KafkaRetryableConfiguration configuration = loadExampleConfiguration(InfiniteRetryExample.CONFIG_FILE, topic, deadLetterTopic);
+        KafkaRetryableConfiguration configuration =
+                loadExampleConfiguration(InfiniteRetryExample.CONFIG_FILE, topic, deadLetterTopic);
 
         // The downstream system fails 3 times before recovering
         try (InfiniteRetryExample example = new InfiniteRetryExample(configuration, 3)) {

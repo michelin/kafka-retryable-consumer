@@ -34,7 +34,7 @@ class DeadLetterConfigurationIntegrationTest extends AbstractSpringExampleIntegr
         createTopic(deadLetterTopic, 1);
 
         try (ConfigurableApplicationContext context = startExample(
-                DeadLetterConfiguration.class, topic, deadLetterTopic, "--kafka.retryable.consumer.retry-max=1")) {
+                DeadLetterConfiguration.class, DeadLetterConfiguration.CONFIG_NAME, topic, deadLetterTopic)) {
 
             produceStringRecords(topic, 1);
 

@@ -37,7 +37,7 @@ class SimpleConsumerRunnerIntegrationTest extends AbstractSpringExampleIntegrati
         createTopic(deadLetterTopic, 1);
 
         try (ConfigurableApplicationContext context =
-                startExample(SimpleConsumerRunner.class, topic, deadLetterTopic)) {
+                startExample(SimpleConsumerRunner.class, SimpleConsumerRunner.CONFIG_NAME, topic, deadLetterTopic)) {
             SimpleConsumerRunner runner = context.getBean(SimpleConsumerRunner.class);
             produceStringRecords(topic, 3);
 

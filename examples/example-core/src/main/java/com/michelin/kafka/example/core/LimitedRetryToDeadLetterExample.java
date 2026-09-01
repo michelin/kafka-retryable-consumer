@@ -15,7 +15,8 @@
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
- */package com.michelin.kafka.example.core;
+ */
+package com.michelin.kafka.example.core;
 
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
