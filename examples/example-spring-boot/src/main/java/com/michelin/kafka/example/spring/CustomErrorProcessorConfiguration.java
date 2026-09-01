@@ -30,6 +30,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -54,7 +55,14 @@ public class CustomErrorProcessorConfiguration {
     /** Configuration file of this example, selected through {@code spring.config.name}. */
     public static final String CONFIG_NAME = "custom-error-processor";
 
-    /** Errors collected by the custom processor, in place of the dead letter topic. */
+    /**
+     * Errors collected by the custom processor, in place of the dead letter topic.
+     *
+     * <p>Test hook only, do not copy this into a real error processor: accumulating every error in memory grows without
+     * bound. A real processor should forward the error to its destination and keep nothing.
+     * {@link CopyOnWriteArrayList} is deliberate, as the test thread iterates this list while the consumer thread
+     * writes to it, which a plain synchronized list could not support safely.
+     */
     @Getter
     private final List<String> collectedErrors = new CopyOnWriteArrayList<>();
 
@@ -83,7 +91,20 @@ public class CustomErrorProcessorConfiguration {
     }
 
     public static void main(String[] args) {
-        new SpringApplicationBuilder(CustomErrorProcessorConfiguration.class)
+        run(args);
+    }
+
+    /**
+     * Boot the example.
+     *
+     * <p>Extracted from {@link #main} so that the integration test starts this very application, with its own
+     * configuration file, instead of rebuilding a similar one and drifting from it.
+     *
+     * @param args command line arguments, which take precedence over the configuration file
+     * @return the running application context
+     */
+    static ConfigurableApplicationContext run(String... args) {
+        return new SpringApplicationBuilder(CustomErrorProcessorConfiguration.class)
                 .web(WebApplicationType.NONE)
                 // Each example of this module owns its configuration file, none of them is merged
                 .properties("spring.config.name=" + CONFIG_NAME)

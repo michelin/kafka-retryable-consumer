@@ -25,6 +25,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -65,7 +66,20 @@ public class StopOnErrorRunner {
     }
 
     public static void main(String[] args) {
-        new SpringApplicationBuilder(StopOnErrorRunner.class)
+        run(args);
+    }
+
+    /**
+     * Boot the example.
+     *
+     * <p>Extracted from {@link #main} so that the integration test starts this very application, with its own
+     * configuration file, instead of rebuilding a similar one and drifting from it.
+     *
+     * @param args command line arguments, which take precedence over the configuration file
+     * @return the running application context
+     */
+    static ConfigurableApplicationContext run(String... args) {
+        return new SpringApplicationBuilder(StopOnErrorRunner.class)
                 .web(WebApplicationType.NONE)
                 // Each example of this module owns its configuration file, none of them is merged
                 .properties("spring.config.name=" + CONFIG_NAME)

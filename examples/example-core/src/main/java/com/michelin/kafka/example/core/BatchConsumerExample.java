@@ -21,7 +21,6 @@ package com.michelin.kafka.example.core;
 import com.michelin.kafka.RetryableBatchConsumer;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
-import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
@@ -41,14 +40,20 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
  * in {@code batch-consumer-example.yml}.
  */
 @Slf4j
-public class BatchConsumerExample implements Closeable {
+public class BatchConsumerExample implements Example {
 
     /** Configuration of this example, loaded from the classpath. */
     public static final String CONFIG_FILE = "batch-consumer-example.yml";
 
     private final RetryableBatchConsumer<String, String> consumer;
 
-    /** Size of every batch received, exposed so that the integration test can assert records came in grouped. */
+    /**
+     * Size of every batch received, exposed so that the integration test can assert records came in grouped.
+     *
+     * <p>Test hook only, do not copy this into a real consumer: accumulating one entry per poll grows without bound and
+     * eventually exhausts the heap. {@link CopyOnWriteArrayList} is deliberate, as the test thread iterates this list
+     * while the consumer thread writes to it, which a plain synchronized list could not support safely.
+     */
     @Getter
     private final List<Integer> batchSizes = new CopyOnWriteArrayList<>();
 
@@ -68,11 +73,13 @@ public class BatchConsumerExample implements Closeable {
         return consumer.listenAsync(this::processBatch);
     }
 
-    /** The business code. Called once per poll, with every record it returned. */
+    /**
+     * The business code. Called once per poll, with every record it returned.
+     *
+     * <p>No need to guard against an empty batch: the library only calls the processor when the poll returned at least
+     * one record.
+     */
     private void processBatch(ConsumerRecords<String, String> records) {
-        if (records.isEmpty()) {
-            return;
-        }
         log.info("Processing a batch of {} records", records.count());
         batchSizes.add(records.count());
         records.forEach(record -> processedRecordCount.incrementAndGet());
@@ -87,9 +94,7 @@ public class BatchConsumerExample implements Closeable {
         consumer.close();
     }
 
-    public static void main(String[] args) throws Exception {
-        try (BatchConsumerExample example = new BatchConsumerExample()) {
-            example.start().get();
-        }
+    public static void main(String[] args) {
+        System.exit(ExampleRunner.run(BatchConsumerExample::new));
     }
 }

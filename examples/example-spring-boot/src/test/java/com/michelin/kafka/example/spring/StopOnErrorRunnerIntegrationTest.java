@@ -35,8 +35,7 @@ class StopOnErrorRunnerIntegrationTest extends AbstractSpringExampleIntegrationT
         createTopic(topic, 1);
         createTopic(deadLetterTopic, 1);
 
-        try (ConfigurableApplicationContext context =
-                startExample(StopOnErrorRunner.class, StopOnErrorRunner.CONFIG_NAME, topic, deadLetterTopic)) {
+        try (ConfigurableApplicationContext context = startExample(StopOnErrorRunner::run, topic, deadLetterTopic)) {
 
             StopOnErrorRunner runner = context.getBean(StopOnErrorRunner.class);
             produceStringRecords(topic, 1);

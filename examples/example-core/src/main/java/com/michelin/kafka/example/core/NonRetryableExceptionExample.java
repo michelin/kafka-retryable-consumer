@@ -21,7 +21,6 @@ package com.michelin.kafka.example.core;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
-import java.io.Closeable;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
@@ -41,7 +40,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
  * as non retryable out of the box, no configuration needed.
  */
 @Slf4j
-public class NonRetryableExceptionExample implements Closeable {
+public class NonRetryableExceptionExample implements Example {
 
     /** Configuration of this example, loaded from the classpath. */
     public static final String CONFIG_FILE = "non-retryable-exception-example.yml";
@@ -86,9 +85,7 @@ public class NonRetryableExceptionExample implements Closeable {
         }
     }
 
-    public static void main(String[] args) throws Exception {
-        try (NonRetryableExceptionExample example = new NonRetryableExceptionExample()) {
-            example.start().get();
-        }
+    public static void main(String[] args) {
+        System.exit(ExampleRunner.run(NonRetryableExceptionExample::new));
     }
 }

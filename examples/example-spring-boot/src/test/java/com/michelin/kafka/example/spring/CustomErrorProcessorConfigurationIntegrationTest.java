@@ -35,11 +35,8 @@ class CustomErrorProcessorConfigurationIntegrationTest extends AbstractSpringExa
         createTopic(topic, 1);
         createTopic(deadLetterTopic, 1);
 
-        try (ConfigurableApplicationContext context = startExample(
-                CustomErrorProcessorConfiguration.class,
-                CustomErrorProcessorConfiguration.CONFIG_NAME,
-                topic,
-                deadLetterTopic)) {
+        try (ConfigurableApplicationContext context =
+                startExample(CustomErrorProcessorConfiguration::run, topic, deadLetterTopic)) {
 
             CustomErrorProcessorConfiguration example = context.getBean(CustomErrorProcessorConfiguration.class);
             produceStringRecords(topic, 1);

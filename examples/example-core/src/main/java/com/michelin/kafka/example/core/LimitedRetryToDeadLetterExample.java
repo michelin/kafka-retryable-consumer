@@ -21,7 +21,6 @@ package com.michelin.kafka.example.core;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
-import java.io.Closeable;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +39,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
  * <p>The dead letter record is an Avro payload, so the dead letter producer needs a schema registry.
  */
 @Slf4j
-public class LimitedRetryToDeadLetterExample implements Closeable {
+public class LimitedRetryToDeadLetterExample implements Example {
 
     /** Configuration of this example, loaded from the classpath. */
     public static final String CONFIG_FILE = "limited-retry-example.yml";
@@ -78,9 +77,7 @@ public class LimitedRetryToDeadLetterExample implements Closeable {
         consumer.close();
     }
 
-    public static void main(String[] args) throws Exception {
-        try (LimitedRetryToDeadLetterExample example = new LimitedRetryToDeadLetterExample()) {
-            example.start().get();
-        }
+    public static void main(String[] args) {
+        System.exit(ExampleRunner.run(LimitedRetryToDeadLetterExample::new));
     }
 }

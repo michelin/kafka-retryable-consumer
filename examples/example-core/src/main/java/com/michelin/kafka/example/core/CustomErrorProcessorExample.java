@@ -22,7 +22,6 @@ import com.michelin.kafka.ErrorProcessor;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
-import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
@@ -45,14 +44,21 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
  * one.
  */
 @Slf4j
-public class CustomErrorProcessorExample implements Closeable {
+public class CustomErrorProcessorExample implements Example {
 
     /** Configuration of this example, loaded from the classpath. */
     public static final String CONFIG_FILE = "custom-error-processor-example.yml";
 
     private final RetryableConsumer<String, String> consumer;
 
-    /** Errors collected by the custom processor, in place of the dead letter topic. */
+    /**
+     * Errors collected by the custom processor, in place of the dead letter topic.
+     *
+     * <p>Test hook only, do not copy this into a real error processor: accumulating every error in memory grows without
+     * bound. A real processor should forward the error to its destination and keep nothing.
+     * {@link CopyOnWriteArrayList} is deliberate, as the test thread iterates this list while the consumer thread
+     * writes to it, which a plain synchronized list could not support safely.
+     */
     @Getter
     private final List<String> collectedErrors = new CopyOnWriteArrayList<>();
 
@@ -86,9 +92,7 @@ public class CustomErrorProcessorExample implements Closeable {
         consumer.close();
     }
 
-    public static void main(String[] args) throws Exception {
-        try (CustomErrorProcessorExample example = new CustomErrorProcessorExample()) {
-            example.start().get();
-        }
+    public static void main(String[] args) {
+        System.exit(ExampleRunner.run(CustomErrorProcessorExample::new));
     }
 }

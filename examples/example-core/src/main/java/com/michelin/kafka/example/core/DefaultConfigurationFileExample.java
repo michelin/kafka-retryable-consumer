@@ -21,6 +21,10 @@ package com.michelin.kafka.example.core;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Future;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
@@ -28,8 +32,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
  * Let the library find its configuration on its own.
  *
  * <p>Every other example of this module names the file it loads, because they all live in the same classpath and each
- * one needs its own settings. A real application usually has a single configuration, and does not need to name it at
- * all.
+ * one needs its own settings. A real application usually has a single configuration and does not need to name it: this
+ * is the shape your own code will most likely take.
  *
  * <p>{@link KafkaRetryableConfiguration#load()} looks for {@code application.yaml}, {@code application.yml} then
  * {@code application.properties} in the classpath, in that order. The {@link RetryableConsumer} constructor taking only
@@ -37,30 +41,55 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
  * {@code src/main/resources/application.yml}.
  */
 @Slf4j
-public class DefaultConfigurationFileExample {
+public class DefaultConfigurationFileExample implements Example {
 
-    private DefaultConfigurationFileExample() {
-        // Only a main method: the point of this example is the configuration file
-    }
+    private final RetryableConsumer<String, String> consumer;
 
     /**
-     * Load the configuration bundled in the classpath, without naming it.
+     * Records handed over to the business code, exposed so that the integration test can assert on them.
      *
-     * @return the configuration declared in {@code application.yml}
-     * @throws KafkaConfigurationException if no configuration file can be found
+     * <p>Test hook only, do not copy this into a real consumer: accumulating every record in memory grows without bound
+     * and eventually exhausts the heap. Real business code should hand the record over to its destination and keep
+     * nothing. {@link CopyOnWriteArrayList} is deliberate, as the test thread iterates this list while the consumer
+     * thread writes to it, which a plain synchronized list could not support safely.
      */
-    public static KafkaRetryableConfiguration loadConfiguration() throws KafkaConfigurationException {
-        return KafkaRetryableConfiguration.load();
+    @Getter
+    private final List<String> processedValues = new CopyOnWriteArrayList<>();
+
+    /**
+     * Build the example without naming any configuration file.
+     *
+     * <p>This single constructor call is the whole point of the example: the consumer discovers {@code application.yml}
+     * by itself.
+     *
+     * @throws KafkaConfigurationException if no configuration file can be found in the classpath
+     */
+    public DefaultConfigurationFileExample() throws KafkaConfigurationException {
+        this.consumer = new RetryableConsumer<>("default-configuration-example");
     }
 
-    private static void process(ConsumerRecord<String, String> record) {
+    /** Build the example from an already loaded configuration, see {@link SimpleConsumerExample}. */
+    public DefaultConfigurationFileExample(KafkaRetryableConfiguration configuration) {
+        this.consumer = new RetryableConsumer<>(configuration);
+    }
+
+    public Future<Void> start() {
+        return consumer.listenAsync(this::process);
+    }
+
+    /** The business code. Called once per record, by the consumer thread. */
+    private void process(ConsumerRecord<String, String> record) {
         log.info("Processing record key={} value={}", record.key(), record.value());
+        processedValues.add(record.value());
     }
 
-    public static void main(String[] args) throws Exception {
+    @Override
+    public void close() {
+        consumer.close();
+    }
+
+    public static void main(String[] args) {
         // Topics, retry policy, dead letter topic and Kafka properties all come from application.yml
-        try (RetryableConsumer<String, String> consumer = new RetryableConsumer<>("default-configuration-example")) {
-            consumer.listen(DefaultConfigurationFileExample::process);
-        }
+        System.exit(ExampleRunner.run(DefaultConfigurationFileExample::new));
     }
 }

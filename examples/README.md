@@ -35,6 +35,29 @@ No broker and no Docker needed, the integration tests start one in memory:
 mvn -pl examples/example-core,examples/example-spring-boot test
 ```
 
+## How the examples are tested
+
+Examples are documentation, so a broken example is a documentation bug. Each one is therefore covered twice:
+
+| Test | What it proves |
+|---|---|
+| One integration test per example | The example behaves as its Javadoc claims, against a real broker |
+| `ExampleConfigurationTest` (`example-core`) | Every shipped configuration file is found, parses, and really declares the capability its example demonstrates |
+| `ExampleRunnerTest` (`example-core`) | The shared entry point reports failures properly and always releases the consumer |
+
+Two rules keep those tests honest:
+
+- The integration tests load the **example's own configuration file** and override only what cannot be known in
+  advance: the broker address, the schema registry and the topic names. Nothing about the demonstrated behaviour is set
+  from the test, so a mistake in a configuration file fails the build instead of being papered over.
+- The Spring examples are booted through their own `run` method, the one `main` delegates to, so the test cannot drift
+  from the entry point a user actually runs.
+
+The `main` methods of `example-core` hold no logic of their own: they delegate to `ExampleRunner.run`, which builds the
+example, waits for it, and turns the outcome into an exit code. That is what makes the error handling testable without
+a broker, and it is why it is written once instead of nine times. A real application would simply inline it in its own
+`main`.
+
 ## example-core
 
 Each class loads its own file through `KafkaRetryableConfiguration.load("<file>")`.

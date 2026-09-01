@@ -21,7 +21,6 @@ package com.michelin.kafka.example.core;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
-import java.io.Closeable;
 import java.util.concurrent.Future;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -37,7 +36,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
  * resumes. The offset of the failed record stays uncommitted, so restarting the application replays it.
  */
 @Slf4j
-public class StopOnErrorExample implements Closeable {
+public class StopOnErrorExample implements Example {
 
     /** Configuration of this example, loaded from the classpath. */
     public static final String CONFIG_FILE = "stop-on-error-example.yml";
@@ -73,10 +72,8 @@ public class StopOnErrorExample implements Closeable {
         consumer.close();
     }
 
-    public static void main(String[] args) throws Exception {
-        try (StopOnErrorExample example = new StopOnErrorExample()) {
-            example.start().get();
-            log.info("Consumer stopped after an unrecoverable error");
-        }
+    public static void main(String[] args) {
+        // The consumer stops itself on the first error, so run() returns normally
+        System.exit(ExampleRunner.run(StopOnErrorExample::new));
     }
 }

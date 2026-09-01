@@ -21,7 +21,6 @@ package com.michelin.kafka.example.core;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
-import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
@@ -43,13 +42,20 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
  * numeric payload published on the topic is a poison pill.
  */
 @Slf4j
-public class DeserializationErrorExample implements Closeable {
+public class DeserializationErrorExample implements Example {
 
     /** Configuration of this example, loaded from the classpath. */
     public static final String CONFIG_FILE = "deserialization-error-example.yml";
 
     private final RetryableConsumer<String, Integer> consumer;
 
+    /**
+     * Records successfully deserialized, exposed so that the integration test can assert the poison pill was skipped.
+     *
+     * <p>Test hook only, do not copy this into a real consumer: accumulating every record in memory grows without bound
+     * and eventually exhausts the heap. {@link CopyOnWriteArrayList} is deliberate, as the test thread iterates this
+     * list while the consumer thread writes to it, which a plain synchronized list could not support safely.
+     */
     @Getter
     private final List<Integer> processedValues = new CopyOnWriteArrayList<>();
 
@@ -77,9 +83,7 @@ public class DeserializationErrorExample implements Closeable {
         consumer.close();
     }
 
-    public static void main(String[] args) throws Exception {
-        try (DeserializationErrorExample example = new DeserializationErrorExample()) {
-            example.start().get();
-        }
+    public static void main(String[] args) {
+        System.exit(ExampleRunner.run(DeserializationErrorExample::new));
     }
 }

@@ -21,7 +21,6 @@ package com.michelin.kafka.example.core;
 import com.michelin.kafka.RetryableConsumer;
 import com.michelin.kafka.configuration.KafkaConfigurationException;
 import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
-import java.io.Closeable;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
@@ -39,14 +38,21 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
  * <p>Everything is declared in {@code simple-consumer-example.yml}, nothing is configured in Java.
  */
 @Slf4j
-public class SimpleConsumerExample implements Closeable {
+public class SimpleConsumerExample implements Example {
 
     /** Configuration of this example, loaded from the classpath. */
     public static final String CONFIG_FILE = "simple-consumer-example.yml";
 
     private final RetryableConsumer<String, String> consumer;
 
-    /** Records handed over to the business code, exposed so that the integration test can assert on them. */
+    /**
+     * Records handed over to the business code, exposed so that the integration test can assert on them.
+     *
+     * <p>Test hook only, do not copy this into a real consumer: accumulating every record in memory grows without bound
+     * and eventually exhausts the heap. Real business code should hand the record over to its destination and keep
+     * nothing. {@link CopyOnWriteArrayList} is deliberate, as the test thread iterates this list while the consumer
+     * thread writes to it, which a plain synchronized list could not support safely.
+     */
     @Getter
     private final List<String> processedValues = new CopyOnWriteArrayList<>();
 
@@ -88,10 +94,8 @@ public class SimpleConsumerExample implements Closeable {
         consumer.close();
     }
 
-    public static void main(String[] args) throws Exception {
-        try (SimpleConsumerExample example = new SimpleConsumerExample()) {
-            // Blocks until the consumer is stopped
-            example.start().get();
-        }
+    public static void main(String[] args) {
+        // Blocks until the consumer is stopped
+        System.exit(ExampleRunner.run(SimpleConsumerExample::new));
     }
 }

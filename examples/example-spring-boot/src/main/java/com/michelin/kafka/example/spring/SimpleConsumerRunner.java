@@ -28,6 +28,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -50,7 +51,14 @@ public class SimpleConsumerRunner {
     /** Configuration file of this example, selected through {@code spring.config.name}. */
     public static final String CONFIG_NAME = "simple-consumer";
 
-    /** Records handed over to the business code, exposed so that the integration test can assert on them. */
+    /**
+     * Records handed over to the business code, exposed so that the integration test can assert on them.
+     *
+     * <p>Test hook only, do not copy this into a real consumer: accumulating every record in memory grows without bound
+     * and eventually exhausts the heap. Real business code should hand the record over to its destination and keep
+     * nothing. {@link CopyOnWriteArrayList} is deliberate, as the test thread iterates this list while the consumer
+     * thread writes to it, which a plain synchronized list could not support safely.
+     */
     @Getter
     private final List<String> processedValues = new CopyOnWriteArrayList<>();
 
@@ -71,7 +79,20 @@ public class SimpleConsumerRunner {
     }
 
     public static void main(String[] args) {
-        new SpringApplicationBuilder(SimpleConsumerRunner.class)
+        run(args);
+    }
+
+    /**
+     * Boot the example.
+     *
+     * <p>Extracted from {@link #main} so that the integration test starts this very application, with its own
+     * configuration file, instead of rebuilding a similar one and drifting from it.
+     *
+     * @param args command line arguments, which take precedence over the configuration file
+     * @return the running application context
+     */
+    static ConfigurableApplicationContext run(String... args) {
+        return new SpringApplicationBuilder(SimpleConsumerRunner.class)
                 .web(WebApplicationType.NONE)
                 // Each example of this module owns its configuration file, none of them is merged
                 .properties("spring.config.name=" + CONFIG_NAME)

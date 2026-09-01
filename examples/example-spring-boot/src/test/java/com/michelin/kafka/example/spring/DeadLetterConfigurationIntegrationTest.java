@@ -33,8 +33,8 @@ class DeadLetterConfigurationIntegrationTest extends AbstractSpringExampleIntegr
         createTopic(topic, 1);
         createTopic(deadLetterTopic, 1);
 
-        try (ConfigurableApplicationContext context = startExample(
-                DeadLetterConfiguration.class, DeadLetterConfiguration.CONFIG_NAME, topic, deadLetterTopic)) {
+        try (ConfigurableApplicationContext context =
+                startExample(DeadLetterConfiguration::run, topic, deadLetterTopic)) {
 
             produceStringRecords(topic, 1);
 

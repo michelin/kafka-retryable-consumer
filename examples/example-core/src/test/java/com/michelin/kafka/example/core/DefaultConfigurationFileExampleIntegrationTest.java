@@ -16,36 +16,44 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.michelin.kafka.example.spring;
+package com.michelin.kafka.example.core;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.michelin.kafka.configuration.KafkaConfigurationException;
+import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ConfigurableApplicationContext;
 
-/** Boots {@link SimpleConsumerRunner} against an embedded broker. */
-class SimpleConsumerRunnerIntegrationTest extends AbstractSpringExampleIntegrationTest {
+/**
+ * Runs {@link DefaultConfigurationFileExample} against an embedded broker.
+ *
+ * <p>The example itself discovers {@code application.yml} on its own. The test names it explicitly, because it has to
+ * retarget the broker address, but it is the very same file.
+ */
+class DefaultConfigurationFileExampleIntegrationTest extends AbstractExampleIntegrationTest {
 
     @Test
-    void shouldProcessEveryRecord() {
-        String topic = uniqueName("spring-simple");
-        String deadLetterTopic = uniqueName("spring-simple-dlt");
+    void shouldProcessEveryRecord() throws KafkaConfigurationException {
+        String topic = uniqueName("default-config");
+        String deadLetterTopic = uniqueName("default-config-dlt");
         createTopic(topic, 1);
         createTopic(deadLetterTopic, 1);
 
-        try (ConfigurableApplicationContext context = startExample(SimpleConsumerRunner::run, topic, deadLetterTopic)) {
-            SimpleConsumerRunner runner = context.getBean(SimpleConsumerRunner.class);
+        KafkaRetryableConfiguration configuration = loadExampleConfiguration("application.yml", topic, deadLetterTopic);
+
+        try (DefaultConfigurationFileExample example = new DefaultConfigurationFileExample(configuration)) {
+            example.start();
             produceStringRecords(topic, 3);
 
             await("the 3 records to be processed")
                     .atMost(CLUSTER_OPERATION_TIMEOUT)
                     .pollInterval(Duration.ofMillis(100))
-                    .until(() -> runner.getProcessedValues().size() == 3);
+                    .until(() -> example.getProcessedValues().size() == 3);
 
-            assertTrue(runner.getProcessedValues().containsAll(List.of("value0", "value1", "value2")));
+            assertTrue(example.getProcessedValues().containsAll(List.of("value0", "value1", "value2")));
         }
 
         assertDeadLetterTopicIsEmpty(deadLetterTopic);
