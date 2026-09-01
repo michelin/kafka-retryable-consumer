@@ -18,6 +18,7 @@
  */
 package com.michelin.kafka.test.unit;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -30,10 +31,11 @@ import com.michelin.kafka.configuration.KafkaRetryableConfiguration;
 import com.michelin.kafka.configuration.RetryableConsumerConfiguration;
 import com.michelin.kafka.error.RetryableConsumerErrorHandler;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.*;
@@ -83,6 +85,21 @@ class RetryableBatchConsumerTest {
     private final int record2Partition = 1;
     private final long record2Offset = 2L;
     private final TopicPartition record2TopicPartition = new TopicPartition(topic, record2Partition);
+
+    /** Budget left to the consumer thread to catch up before an assertion is considered failed. */
+    private static final Duration AWAIT_TIMEOUT = Duration.ofSeconds(10);
+
+    /**
+     * Null-safe read of the consumer internal offset position. The offsets map is fed by the consumer thread while the
+     * test thread reads it, so callers must poll this value through Awaitility rather than reading it once.
+     *
+     * @return the current offset for the given partition, or -1 if the partition is not tracked yet
+     */
+    private static long currentOffsetOf(
+            RetryableBatchConsumer<String, String> consumer, TopicPartition topicPartition) {
+        OffsetAndMetadata offsetAndMetadata = consumer.getCurrentOffset(topicPartition);
+        return offsetAndMetadata == null ? -1L : offsetAndMetadata.offset();
+    }
 
     @BeforeEach
     void setUp(TestInfo testInfo) throws Exception {
@@ -180,9 +197,10 @@ class RetryableBatchConsumerTest {
         // Check we continuously call poll (infinite retry)
         verify(kafkaConsumer, timeout(5000).atLeast(3)).poll(any());
 
-        // Check we do not send anything in DLQ because of infinite retry
-        verify(errorHandler, timeout(5000).times(0)).handleError(any(), any());
-        verify(errorHandler, timeout(5000).times(0)).handleError(any(), any(), any());
+        // Check we do not send anything in DLQ because of infinite retry.
+        // after().never() actually waits for the delay, unlike timeout().times(0) which returns immediately.
+        verify(errorHandler, after(500).never()).handleError(any(), any());
+        verify(errorHandler, after(500).never()).handleError(any(), any(), any());
     }
 
     @Test
@@ -219,37 +237,42 @@ class RetryableBatchConsumerTest {
         // Check the record is sent to DLQ
         verify(errorHandler, timeout(5000).times(1)).handleError(any(), any());
 
-        // Check we have correctly skipped the record
-        assertNotNull(retryableBatchConsumer.getCurrentOffset(record1TopicPartition));
-        assertEquals(
-                retryableBatchConsumer.getCurrentOffset(record1TopicPartition).offset(), record1Offset + 1);
+        // Check we have correctly skipped the record.
+        // The offset is committed after handleError() returns, hence the wait.
+        await().atMost(AWAIT_TIMEOUT)
+                .untilAsserted(() -> assertEquals(
+                        record1Offset + 1, currentOffsetOf(retryableBatchConsumer, record1TopicPartition)));
     }
 
     @Test
     @Order(4)
     void listenAsync_shouldFailWithStopOnErrorConfigInBatch() throws Exception {
-        RetryableBatchConsumer<String, String> retryableBatchConsumerStopOnError = new RetryableBatchConsumer<>(
-                retryableConfigurationStopOnError, kafkaConsumer, errorHandler, rebalanceListener);
+        try (RetryableBatchConsumer<String, String> retryableBatchConsumerStopOnError = new RetryableBatchConsumer<>(
+                retryableConfigurationStopOnError, kafkaConsumer, errorHandler, rebalanceListener)) {
 
-        ConsumerRecord<String, String> consumerRecord =
-                new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
+            ConsumerRecord<String, String> consumerRecord =
+                    new ConsumerRecord<>(topic, record1Partition, record1Offset, "key", "value");
 
-        when(kafkaConsumer.poll(any()))
-                .thenReturn(new ConsumerRecords<>(
-                        Collections.singletonMap(record1TopicPartition, Collections.singletonList(consumerRecord)),
-                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))))
-                .thenReturn(new ConsumerRecords<>(
-                        Collections.emptyMap(),
-                        Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))));
+            when(kafkaConsumer.poll(any()))
+                    .thenReturn(new ConsumerRecords<>(
+                            Collections.singletonMap(record1TopicPartition, Collections.singletonList(consumerRecord)),
+                            Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))))
+                    .thenReturn(new ConsumerRecords<>(
+                            Collections.emptyMap(),
+                            Collections.singletonMap(record1TopicPartition, new OffsetAndMetadata(1L))));
 
-        doThrow(new CustomNotRetryableException()).when(batchProcessorNoError).processRecords(any());
+            doThrow(new CustomNotRetryableException())
+                    .when(batchProcessorNoError)
+                    .processRecords(any());
 
-        retryableBatchConsumerStopOnError.listenAsync(records -> batchProcessorNoError.processRecords(records));
-        verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
-        verify(errorHandler, timeout(5000).times(1)).handleError(any(), isNull());
+            retryableBatchConsumerStopOnError.listenAsync(records -> batchProcessorNoError.processRecords(records));
+            verify(kafkaConsumer, timeout(5000).atLeast(1)).poll(any());
+            verify(errorHandler, timeout(5000).times(1)).handleError(any(), isNull());
 
-        // Check the consumer is stopped
-        assertTrue(retryableBatchConsumerStopOnError.isStopped());
+            // Check the consumer is stopped. stop() is called *after* handleError() returns, so we must wait
+            // for it instead of asserting straight away.
+            await().atMost(AWAIT_TIMEOUT).until(retryableBatchConsumerStopOnError::isStopped);
+        }
     }
 
     @Test
@@ -280,9 +303,10 @@ class RetryableBatchConsumerTest {
             retryableBatchConsumerCustomError.listenAsync(records -> batchProcessorNoError.processRecords(records));
             verify(kafkaConsumer, timeout(5000).atLeastOnce()).poll(any());
 
-            // Wait for error to be processed
-            Thread.sleep(1000);
-            assertEquals(1, customErrorProcessor.getErrors().size());
+            // Wait for the error to be processed instead of hoping 1s is enough on a busy machine
+            await().atMost(AWAIT_TIMEOUT)
+                    .untilAsserted(() ->
+                            assertEquals(1, customErrorProcessor.getErrors().size()));
             assertEquals(
                     "Test Batch Custom Error Processor",
                     customErrorProcessor.getErrors().get(0));
@@ -321,7 +345,8 @@ class RetryableBatchConsumerTest {
 
     @Getter
     static class CustomBatchErrorProcessor implements ErrorProcessor<ConsumerRecord<String, String>> {
-        List<String> errors = new ArrayList<>();
+        // Written by the consumer thread, read by the test thread
+        List<String> errors = new CopyOnWriteArrayList<>();
 
         @Override
         public void processError(Throwable throwable, ConsumerRecord<String, String> record, Long retryCount) {

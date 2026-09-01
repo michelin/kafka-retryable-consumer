@@ -37,6 +37,18 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Kafka -->
+        <!--
+            The starter uses the Kafka client API directly (ConsumerConfig, serializers), so the dependency is
+            declared explicitly. The version is pinned on the one targeted by the core library, otherwise the
+            Spring Boot BOM imported above would downgrade it and break the binary compatibility with the core.
+        -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>${kafka.apache.version}</version>
+        </dependency>
+
         <!-- Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -64,7 +76,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- Kafka -->
         <dependency>
             <groupId>org.springframework.kafka</groupId>
             <artifactId>spring-kafka</artifactId>

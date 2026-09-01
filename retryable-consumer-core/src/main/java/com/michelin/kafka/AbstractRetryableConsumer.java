@@ -28,9 +28,9 @@ import java.io.Closeable;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -64,7 +64,7 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
      * Map saving the current offset of TopicPartitions treated by this consumer. This offsets map is used to manage
      * rewind in case of error or retry.
      */
-    protected final Map<TopicPartition, OffsetAndMetadata> offsets = new HashMap<>();
+    protected final Map<TopicPartition, OffsetAndMetadata> offsets = new ConcurrentHashMap<>();
 
     @Getter
     protected String name;
@@ -72,7 +72,12 @@ public abstract class AbstractRetryableConsumer<K, V, P> implements Closeable {
     protected final RetryableConsumerErrorHandler<K, V> errorHandler;
 
     protected int retryCounter;
-    protected boolean wakeUp;
+
+    /**
+     * Stop flag. Written by {@link #stop()} (typically from another thread) and read by the poll loop and by
+     * {@link #isStopped()}, hence the {@code volatile}: without it the loop may never observe the write.
+     */
+    protected volatile boolean wakeUp;
 
     // ---- Constructors ----
 
