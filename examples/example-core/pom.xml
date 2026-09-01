@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.michelin.kafka</groupId>
+        <artifactId>kafka-retryable-consumer-examples</artifactId>
+        <version>1.2.4-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>example-core</artifactId>
+
+    <name>example-core</name>
+    <description>Plain Java examples of the retryable consumer, one capability per class.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.michelin.kafka</groupId>
+            <artifactId>retryable-consumer-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!--
+            A logging binding is required to actually see what the examples do when a main method is run.
+            The library itself only depends on the slf4j API, as a library should.
+        -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>${slf4j.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+</project>

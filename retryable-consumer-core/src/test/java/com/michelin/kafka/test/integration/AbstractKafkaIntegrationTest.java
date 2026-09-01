@@ -161,6 +161,18 @@ public abstract class AbstractKafkaIntegrationTest {
     }
 
     /**
+     * Address of the embedded broker, known only once it is started.
+     *
+     * <p>Needed by the tests that do not build their configuration with {@link #newConfiguration(String, String)}, for
+     * instance those loading the configuration file of an example and overriding only the broker coordinates.
+     *
+     * @return the bootstrap servers of the embedded cluster
+     */
+    protected static String bootstrapServers() {
+        return cluster().bootstrapServers();
+    }
+
+    /**
      * Create a topic and wait until every partition has an elected leader. Producing before the leader election is
      * complete is the main source of unexplained delays in Kafka integration tests.
      *

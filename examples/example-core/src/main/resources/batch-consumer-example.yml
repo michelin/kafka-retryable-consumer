@@ -1,0 +1,39 @@
+# Configuration of BatchConsumerExample.
+# max.poll.records is what sizes the batches handed over to the business code.
+kafka:
+  retryable:
+    name: batch-consumer-example
+    consumer:
+      topics: batch-consumer-example
+      properties: # Plain Kafka consumer properties
+        bootstrap:
+          servers: localhost:9092
+        group:
+          id: batch-consumer-example
+        auto:
+          offset:
+            reset: earliest
+        enable:
+          auto:
+            commit: false # The library commits offsets itself, once the processing succeeded
+        key:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        max:
+          poll:
+            records: 10 # Upper bound of a batch
+    dead-letter:
+      producer:
+        topic: batch-consumer-example-dlt
+        properties:
+          bootstrap:
+            servers: localhost:9092
+          # The dead letter payload is an Avro record, hence the registry and the Avro serializer
+          schema:
+            registry:
+              url: http://localhost:8081
+          key:
+            serializer: org.apache.kafka.common.serialization.StringSerializer
+          value:
+            serializer: io.confluent.kafka.serializers.KafkaAvroSerializer

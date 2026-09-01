@@ -1,0 +1,36 @@
+# Configuration of DeserializationErrorExample.
+# The consumer expects integer values: any other payload published on the topic is a poison pill.
+kafka:
+  retryable:
+    name: deserialization-error-example
+    consumer:
+      topics: deserialization-error-example
+      properties: # Plain Kafka consumer properties
+        bootstrap:
+          servers: localhost:9092
+        group:
+          id: deserialization-error-example
+        auto:
+          offset:
+            reset: earliest
+        enable:
+          auto:
+            commit: false # The library commits offsets itself, once the processing succeeded
+        key:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value:
+          deserializer: org.apache.kafka.common.serialization.IntegerDeserializer
+    dead-letter:
+      producer:
+        topic: deserialization-error-example-dlt
+        properties:
+          bootstrap:
+            servers: localhost:9092
+          # The dead letter payload is an Avro record, hence the registry and the Avro serializer
+          schema:
+            registry:
+              url: http://localhost:8081
+          key:
+            serializer: org.apache.kafka.common.serialization.StringSerializer
+          value:
+            serializer: io.confluent.kafka.serializers.KafkaAvroSerializer

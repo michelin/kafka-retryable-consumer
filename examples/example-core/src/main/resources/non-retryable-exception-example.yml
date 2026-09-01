@@ -1,0 +1,43 @@
+# Configuration of NonRetryableExceptionExample.
+# The exceptions listed below bypass the retry mechanism entirely, whatever the retry budget.
+kafka:
+  retryable:
+    name: non-retryable-exception-example
+    consumer:
+      topics: non-retryable-exception-example
+      # A generous budget, deliberately: it proves the exception below really bypasses it
+      retry:
+        max: 10
+      # RecordDeserializationException, NoSuchMethodException and ClassCastException are already
+      # treated as non retryable out of the box, no need to list them here.
+      not-retryable-exceptions:
+        - com.michelin.kafka.example.core.NonRetryableExceptionExample$InvalidOrderException
+      properties: # Plain Kafka consumer properties
+        bootstrap:
+          servers: localhost:9092
+        group:
+          id: non-retryable-exception-example
+        auto:
+          offset:
+            reset: earliest
+        enable:
+          auto:
+            commit: false # The library commits offsets itself, once the processing succeeded
+        key:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    dead-letter:
+      producer:
+        topic: non-retryable-exception-example-dlt
+        properties:
+          bootstrap:
+            servers: localhost:9092
+          # The dead letter payload is an Avro record, hence the registry and the Avro serializer
+          schema:
+            registry:
+              url: http://localhost:8081
+          key:
+            serializer: org.apache.kafka.common.serialization.StringSerializer
+          value:
+            serializer: io.confluent.kafka.serializers.KafkaAvroSerializer

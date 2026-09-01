@@ -1,0 +1,39 @@
+# Configuration of StopOnErrorExample.
+# stop-on-error makes the consumer give up rather than skip an unrecoverable record.
+kafka:
+  retryable:
+    name: stop-on-error-example
+    consumer:
+      topics: stop-on-error-example
+      stop-on-error: true # The offset of the failed record stays uncommitted, a restart replays it
+      retry:
+        max: 1 # A single attempt, so the example does not linger before demonstrating the stop
+      properties: # Plain Kafka consumer properties
+        bootstrap:
+          servers: localhost:9092
+        group:
+          id: stop-on-error-example
+        auto:
+          offset:
+            reset: earliest
+        enable:
+          auto:
+            commit: false # The library commits offsets itself, once the processing succeeded
+        key:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    dead-letter:
+      producer:
+        topic: stop-on-error-example-dlt
+        properties:
+          bootstrap:
+            servers: localhost:9092
+          # The dead letter payload is an Avro record, hence the registry and the Avro serializer
+          schema:
+            registry:
+              url: http://localhost:8081
+          key:
+            serializer: org.apache.kafka.common.serialization.StringSerializer
+          value:
+            serializer: io.confluent.kafka.serializers.KafkaAvroSerializer

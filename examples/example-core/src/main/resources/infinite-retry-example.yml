@@ -1,0 +1,40 @@
+# Configuration of InfiniteRetryExample.
+# retry.max = 0 is what enables the infinite retry. It is also the default value.
+kafka:
+  retryable:
+    name: infinite-retry-example
+    consumer:
+      topics: infinite-retry-example
+      retry:
+        max: 0 # 0 means retry forever: nothing is ever sent to the dead letter topic
+        backoff:
+          ms: 100
+      properties: # Plain Kafka consumer properties
+        bootstrap:
+          servers: localhost:9092
+        group:
+          id: infinite-retry-example
+        auto:
+          offset:
+            reset: earliest
+        enable:
+          auto:
+            commit: false # The library commits offsets itself, once the processing succeeded
+        key:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value:
+          deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    dead-letter:
+      producer:
+        topic: infinite-retry-example-dlt
+        properties:
+          bootstrap:
+            servers: localhost:9092
+          # The dead letter payload is an Avro record, hence the registry and the Avro serializer
+          schema:
+            registry:
+              url: http://localhost:8081
+          key:
+            serializer: org.apache.kafka.common.serialization.StringSerializer
+          value:
+            serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
